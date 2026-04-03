@@ -806,6 +806,10 @@ def dashboard():
 def link_vatsim_page():
     return send_from_directory("../frontend", "link-vatsim.html")
 
+@app.route("/roadmap")
+def roadmap_page():
+    return send_from_directory("../frontend", "roadmap.html")
+
 @app.route("/<path:path>")
 def static_files(path):
     return send_from_directory("../frontend", path)

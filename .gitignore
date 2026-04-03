@@ -2,6 +2,7 @@
 .env
 # Exclude the SQLite database
 flights.db
+roadmap.html
 
 # Optional: Exclude any temporary WAL (Write-Ahead Logging) files SQLite creates
 flights.db-journal
