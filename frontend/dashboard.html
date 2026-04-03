@@ -3,456 +3,137 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>Dashboard — VATSIM HeatTracker</title>
+<title>Dashboard - VATSIM HeatTracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;400;600;700&family=Barlow+Condensed:wght@700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <style>
-  :root {
-    --bg:       #040d0f;
-    --surface:  #071418;
-    --surface2: #0a1e26;
-    --border:   #0d3040;
-    --green:    #00ffa3;
-    --green-dim:#00ffa320;
-    --amber:    #ffb700;
-    --blue:     #00c8ff;
-    --red:      #ff4d6d;
-    --discord:  #5865F2;
-    --text:     #c8dde4;
-    --muted:    #4a6875;
-    --mono:     'Share Tech Mono', monospace;
-  }
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    background: var(--bg); color: var(--text);
-    font-family: 'Barlow', sans-serif;
-    height: 100vh; overflow: hidden;
-    display: flex; flex-direction: column;
-  }
-
-  /* ── Top Bar ── */
-  .topbar {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 0.75rem 1.5rem;
-    border-bottom: 1px solid var(--border);
-    background: var(--surface); flex-shrink: 0; z-index: 100;
-  }
-  .logo {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 900; font-size: 1.25rem; letter-spacing: 0.05em;
-    color: var(--green); text-decoration: none;
-  }
-  .logo span { color: var(--text); font-weight: 300; }
-
-  .topbar-right { display: flex; align-items: center; gap: 0.75rem; }
-
-  .identity {
-    display: flex; align-items: center; gap: 0.5rem;
-    font-family: var(--mono); font-size: 0.7rem; color: var(--text);
-  }
-  .discord-tag {
-    display: inline-flex; align-items: center; gap: 0.35rem;
-    background: rgba(88,101,242,0.15); border: 1px solid rgba(88,101,242,0.35);
-    color: #8b97ff; padding: 0.22rem 0.6rem;
-  }
-  .vatsim-tag {
-    background: var(--green-dim); border: 1px solid var(--green);
-    color: var(--green); padding: 0.22rem 0.6rem;
-    font-family: var(--mono); font-size: 0.7rem;
-    display: inline-flex; align-items: center; gap: 0.3rem;
-  }
-
-  .btn-sm {
-    font-family: 'Barlow Condensed', sans-serif;
-    font-weight: 700; font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase;
-    padding: 0.35rem 0.85rem; border: 1px solid var(--border);
-    background: transparent; color: var(--muted); cursor: pointer; text-decoration: none;
-    transition: border-color 0.2s, color 0.2s;
-  }
-  .btn-sm:hover { border-color: var(--text); color: var(--text); }
-  .btn-sm.danger:hover { border-color: var(--red); color: var(--red); }
-
-  /* ── Layout ── */
-  .layout {
-    display: grid; grid-template-columns: 310px 1fr;
-    flex: 1; overflow: hidden;
-  }
-
-  /* ── Sidebar ── */
-  .sidebar {
-    background: var(--surface); border-right: 1px solid var(--border);
-    overflow-y: auto; display: flex; flex-direction: column;
-  }
-  .sidebar::-webkit-scrollbar { width: 4px; }
-  .sidebar::-webkit-scrollbar-thumb { background: var(--border); }
-
-  .sidebar-section { border-bottom: 1px solid var(--border); padding: 1.1rem 1.25rem; }
-  .section-label {
-    font-family: var(--mono); font-size: 0.62rem; letter-spacing: 0.2em;
-    text-transform: uppercase; color: var(--muted); margin-bottom: 0.9rem;
-    display: flex; align-items: center; gap: 0.5rem;
-  }
-  .section-label::after { content:''; flex:1; height:1px; background:var(--border); }
-
-  /* Live card */
-  .live-card {
-    background: var(--surface2); border: 1px solid var(--border);
-    padding: 1rem; position: relative; overflow: hidden;
-  }
-  .live-card::before {
-    content:''; position:absolute; top:0; left:0; right:0; height:2px;
-    background: var(--green);
-  }
-  .live-badge {
-    display:inline-flex; align-items:center; gap:0.4rem;
-    font-family:var(--mono); font-size:0.62rem; color:var(--green); margin-bottom:0.7rem;
-  }
-  .pulse {
-    width:6px; height:6px; border-radius:50%; background:var(--green);
-    animation: pulse 1.5s infinite;
-  }
-  @keyframes pulse {
-    0%{box-shadow:0 0 0 0 rgba(0,255,163,.5)}
-    70%{box-shadow:0 0 0 8px rgba(0,255,163,0)}
-    100%{box-shadow:0 0 0 0 rgba(0,255,163,0)}
-  }
-  .callsign {
-    font-family:'Barlow Condensed',sans-serif; font-weight:900; font-size:1.8rem;
-    letter-spacing:0.05em; color:#fff; line-height:1; margin-bottom:0.5rem;
-  }
-  .route-line {
-    font-family:var(--mono); font-size:0.78rem; color:var(--blue);
-    display:flex; align-items:center; gap:0.4rem; margin-bottom:0.7rem;
-  }
-  .route-line .arrow { color:var(--muted); }
-  .telemetry { display:grid; grid-template-columns:1fr 1fr; gap:0.5rem; }
-  .telem-label { font-family:var(--mono); font-size:0.58rem; letter-spacing:0.12em; color:var(--muted); text-transform:uppercase; display:block; }
-  .telem-value { font-family:var(--mono); font-size:0.9rem; color:var(--text); }
-  .telem-value.hi { color:var(--amber); }
-  .offline-state { text-align:center; padding:1.25rem 0; color:var(--muted); font-family:var(--mono); font-size:0.78rem; }
-  .offline-state .ico { font-size:1.8rem; display:block; margin-bottom:0.4rem; opacity:0.4; }
-
-  /* Stats */
-  .stats-grid { display:grid; grid-template-columns:1fr 1fr; gap:0.65rem; }
-  .stat-box { background:var(--surface2); border:1px solid var(--border); padding:0.7rem; }
-  .stat-num { font-family:'Barlow Condensed',sans-serif; font-weight:900; font-size:1.6rem; color:var(--green); line-height:1; }
-  .stat-label { font-family:var(--mono); font-size:0.58rem; letter-spacing:0.12em; color:var(--muted); text-transform:uppercase; margin-top:0.15rem; }
-
-  /* Routes */
-  .route-item {
-    display:flex; justify-content:space-between; align-items:center;
-    padding:0.45rem 0; border-bottom:1px solid var(--border);
-    font-family:var(--mono); font-size:0.72rem;
-  }
-  .route-item:last-child { border-bottom:none; }
-  .route-airports { color:var(--blue); }
-  .route-count { background:var(--green-dim); border:1px solid var(--green); color:var(--green); padding:0.08rem 0.4rem; font-size:0.62rem; }
-
-  /* Flights */
-  .flight-item { padding:0.65rem 0; border-bottom:1px solid var(--border); }
-  .flight-item:last-child { border-bottom:none; }
-  .flight-cs { font-family:'Barlow Condensed',sans-serif; font-weight:700; font-size:0.95rem; color:#fff; }
-  .flight-meta { font-family:var(--mono); font-size:0.62rem; color:var(--muted); margin-top:0.15rem; }
-
-  /* Sidebar footer */
-  .sidebar-footer {
-    margin-top: auto;
-    padding: 0.85rem 1.25rem;
-    border-top: 1px solid var(--border);
-    font-family: var(--mono); font-size: 0.65rem; color: var(--muted);
-    display: flex; justify-content: space-between; align-items: center;
-  }
-  .sidebar-footer a { color: var(--muted); text-decoration: none; transition: color 0.2s; }
-  .sidebar-footer a:hover { color: var(--green); }
-
-  /* ── Map ── */
-  .map-area { position:relative; display:flex; flex-direction:column; }
-  .map-toolbar {
-    display:flex; align-items:center; gap:0.5rem; padding:0.55rem 1rem;
-    background:var(--surface); border-bottom:1px solid var(--border); flex-shrink:0;
-  }
-  .map-btn {
-    font-family:var(--mono); font-size:0.68rem; letter-spacing:0.08em; text-transform:uppercase;
-    padding:0.32rem 0.75rem; border:1px solid var(--border);
-    background:transparent; color:var(--muted); cursor:pointer; transition:all .2s;
-  }
-  .map-btn.active, .map-btn:hover { border-color:var(--green); color:var(--green); background:var(--green-dim); }
-  .map-spacer { flex:1; }
-  .refresh-indicator { font-family:var(--mono); font-size:0.62rem; color:var(--muted); }
-  #refreshCountdown { color:var(--amber); }
-
-  #map { flex:1; }
-  .leaflet-tile { filter:invert(1) hue-rotate(180deg) saturate(1.2) brightness(0.8); }
-  .leaflet-container { background:#040d0f; }
-
-  .plane-marker { width:32px; height:32px; display:flex; align-items:center; justify-content:center; font-size:20px; filter:drop-shadow(0 0 6px rgba(0,255,163,.8)); }
-
-  .loading-overlay {
-    position:absolute; inset:0; background:rgba(4,13,15,.85);
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    z-index:500; font-family:var(--mono);
-  }
-  .loading-spinner { width:44px; height:44px; border:2px solid var(--border); border-top-color:var(--green); border-radius:50%; animation:spin .8s linear infinite; margin-bottom:1rem; }
-  @keyframes spin { to{transform:rotate(360deg)} }
-  .loading-text { color:var(--green); font-size:0.75rem; letter-spacing:0.15em; }
-
-  #authGuard {
-    position:fixed; inset:0; z-index:999; background:var(--bg);
-    display:flex; align-items:center; justify-content:center;
-    font-family:var(--mono); color:var(--muted); font-size:0.8rem;
-  }
+  :root{--bg:#02070a;--surface:#071318;--surface2:#0b1d26;--panel:rgba(8,26,31,.88);--border:rgba(53,102,120,.36);--green:#1dffb2;--greenSoft:rgba(29,255,178,.15);--cyan:#59d8ff;--gold:#ffca58;--red:#ff6b81;--text:#d7ebf1;--muted:#6d8c98;--mono:"Share Tech Mono",monospace;--shadow:0 20px 60px rgba(0,0,0,.32)}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{min-height:100vh;background:radial-gradient(circle at top left,rgba(51,133,156,.2),transparent 30%),radial-gradient(circle at top right,rgba(27,255,177,.08),transparent 24%),linear-gradient(180deg,#051015 0%,#02070a 100%);color:var(--text);font-family:"Barlow",sans-serif;overflow:hidden}
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;background-image:linear-gradient(rgba(89,216,255,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(89,216,255,.03) 1px,transparent 1px);background-size:44px 44px;mask-image:linear-gradient(180deg,rgba(0,0,0,.4),transparent 92%)}
+  .topbar{height:72px;display:flex;align-items:center;justify-content:space-between;padding:0 1.5rem;border-bottom:1px solid var(--border);background:rgba(3,11,14,.88);backdrop-filter:blur(18px);position:relative;z-index:1000}
+  .logo{text-decoration:none;color:var(--green);font-family:"Barlow Condensed",sans-serif;font-size:1.7rem;font-weight:900;letter-spacing:.05em}.logo span{color:#fff;font-weight:300}
+  .topbar-right,.identity{display:flex;align-items:center;gap:.75rem;flex-wrap:wrap}
+  .identity{gap:.5rem;font-family:var(--mono);font-size:.7rem}
+  .pill{display:inline-flex;align-items:center;gap:.4rem;padding:.34rem .7rem;border:1px solid var(--border);background:rgba(5,20,26,.92)}
+  .pill.discord{color:#9aa6ff;border-color:rgba(116,129,255,.34);background:rgba(88,101,242,.12)}
+  .pill.vatsim{color:var(--green);border-color:rgba(29,255,178,.4);background:var(--greenSoft)}
+  .btn-sm{cursor:pointer;text-decoration:none;padding:.42rem .8rem;background:transparent;color:var(--muted);border:1px solid var(--border);font:700 .72rem "Barlow Condensed",sans-serif;letter-spacing:.14em;text-transform:uppercase;transition:.2s ease}
+  .btn-sm:hover{border-color:var(--green);color:var(--green)}.btn-sm.danger:hover{border-color:var(--red);color:var(--red)}
+  .layout{height:calc(100vh - 72px);display:grid;grid-template-columns:320px minmax(0,1fr)}
+  .sidebar{background:rgba(4,14,18,.94);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto}
+  .sidebar-section{padding:1.1rem 1.2rem;border-bottom:1px solid var(--border)}
+  .section-label{display:flex;align-items:center;gap:.6rem;margin-bottom:.9rem;color:var(--muted);font:.63rem var(--mono);letter-spacing:.22em;text-transform:uppercase}
+  .section-label::after{content:"";height:1px;flex:1;background:var(--border)}
+  .live-card{background:radial-gradient(circle at top right,rgba(89,216,255,.08),transparent 30%),linear-gradient(180deg,rgba(8,24,31,.98),rgba(7,20,25,.95));border:1px solid var(--border);box-shadow:var(--shadow);padding:1rem;position:relative;overflow:hidden}
+  .live-card::before{content:"";position:absolute;left:0;top:0;width:100%;height:2px;background:linear-gradient(90deg,var(--green),var(--cyan),transparent)}
+  .live-badge{display:inline-flex;align-items:center;gap:.45rem;color:var(--green);font:.65rem var(--mono);margin-bottom:.8rem}
+  .pulse{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 rgba(29,255,178,.5);animation:pulse 1.5s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(29,255,178,.4)}70%{box-shadow:0 0 0 10px rgba(29,255,178,0)}100%{box-shadow:0 0 0 0 rgba(29,255,178,0)}}
+  .callsign{color:#fff;font:900 2rem "Barlow Condensed",sans-serif;letter-spacing:.05em;line-height:.94;margin-bottom:.5rem}
+  .route-line{display:flex;gap:.45rem;align-items:center;color:var(--cyan);font:.78rem var(--mono);margin-bottom:.9rem}.route-line .arrow{color:var(--muted)}
+  .telemetry{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.7rem .5rem}
+  .telem-label{display:block;color:var(--muted);font:.58rem var(--mono);letter-spacing:.14em;text-transform:uppercase;margin-bottom:.15rem}
+  .telem-value{font:.92rem var(--mono);color:var(--text)}.telem-value.hi{color:var(--gold)}
+  .offline-state{border:1px dashed var(--border);background:rgba(7,20,25,.65);color:var(--muted);font:.78rem var(--mono);text-align:center;padding:1.25rem 1rem}.offline-state .ico{display:block;font-size:1.8rem;opacity:.4;margin-bottom:.35rem}
+  .stats-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.7rem}
+  .stat-box{background:var(--surface2);border:1px solid var(--border);padding:.8rem}
+  .stat-num{color:var(--green);font:900 1.8rem "Barlow Condensed",sans-serif;line-height:1}
+  .stat-label{color:var(--muted);font:.58rem var(--mono);letter-spacing:.14em;text-transform:uppercase;margin-top:.2rem}
+  .route-item,.flight-item,.insight-row{padding:.48rem 0;border-bottom:1px solid rgba(53,102,120,.25)}.route-item:last-child,.flight-item:last-child,.insight-row:last-child{border-bottom:none}
+  .route-item,.insight-row{display:flex;align-items:center;justify-content:space-between;gap:1rem;font:.72rem var(--mono)}
+  .route-airports{color:var(--cyan)}.route-count{padding:.08rem .42rem;border:1px solid rgba(29,255,178,.38);background:var(--greenSoft);color:var(--green);font-size:.62rem}
+  .flight-cs{color:#fff;font:700 .98rem "Barlow Condensed",sans-serif}.flight-meta,.insight-row{color:var(--muted);font:.63rem var(--mono)}.insight-value{color:var(--text)}
+  .sidebar-footer{margin-top:auto;padding:.95rem 1.2rem;border-top:1px solid var(--border);display:flex;justify-content:space-between;gap:1rem;color:var(--muted);font:.66rem var(--mono)}
+  .sidebar-footer a{color:inherit;text-decoration:none}.sidebar-footer a:hover{color:var(--green)}
+  .map-area{position:relative;min-width:0;display:flex;flex-direction:column}
+  .map-toolbar{display:flex;align-items:center;gap:.6rem;padding:.75rem 1rem;border-bottom:1px solid var(--border);background:rgba(5,18,24,.88);backdrop-filter:blur(16px);z-index:600}
+  .mode-group,.base-group{display:inline-flex;align-items:center;gap:.35rem;padding:.18rem;border:1px solid var(--border);background:rgba(4,14,18,.75)}
+  .map-btn{cursor:pointer;padding:.42rem .78rem;border:1px solid transparent;background:transparent;color:var(--muted);font:.68rem var(--mono);letter-spacing:.1em;text-transform:uppercase;transition:.2s ease}
+  .map-btn.active{background:var(--greenSoft);border-color:rgba(29,255,178,.36);color:var(--green)}.map-btn:not(.active):hover{color:var(--text)}
+  .map-spacer{flex:1}.map-meta{display:flex;align-items:center;gap:.65rem;flex-wrap:wrap;justify-content:flex-end}.refresh-indicator,.legend,.live-status{color:var(--muted);font:.62rem var(--mono)}.legend strong,.live-status strong{color:var(--text);font-weight:400}#refreshCountdown{color:var(--gold)}
+  #map{flex:1;min-height:0;background:#07151b}.leaflet-container{background:#07151b;font-family:"Barlow",sans-serif}
+  .leaflet-control-container .leaflet-top.leaflet-left{top:12px}.leaflet-control-attribution{background:rgba(7,19,24,.88)!important;color:var(--muted);border:1px solid var(--border)}.leaflet-control-attribution a{color:var(--text)}
+  .leaflet-bar a{background:rgba(255,255,255,.92);color:#101010;border-bottom-color:rgba(0,0,0,.1)}
+  .density-node,.route-node,.live-node{border-radius:50%}
+  .density-node{background:radial-gradient(circle,rgba(255,255,255,.95) 0%,rgba(255,202,88,.9) 18%,rgba(89,216,255,.38) 55%,rgba(89,216,255,0) 100%);box-shadow:0 0 26px rgba(89,216,255,.28)}
+  .route-node{background:rgba(255,255,255,.88);box-shadow:0 0 16px rgba(255,255,255,.18)}
+  .live-node{background:radial-gradient(circle,rgba(29,255,178,1) 0%,rgba(29,255,178,.3) 55%,rgba(29,255,178,0) 100%);box-shadow:0 0 28px rgba(29,255,178,.45)}
+  .plane-marker{width:40px;height:40px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px;text-shadow:0 0 10px rgba(29,255,178,.75);filter:drop-shadow(0 0 14px rgba(29,255,178,.45))}
+  .map-overlay{position:absolute;left:1rem;top:5.3rem;z-index:550;width:min(340px,calc(100% - 2rem));padding:1rem 1.1rem;border:1px solid var(--border);background:var(--panel);box-shadow:var(--shadow);backdrop-filter:blur(14px)}
+  .overlay-label{color:var(--green);font:.62rem var(--mono);letter-spacing:.2em;text-transform:uppercase;margin-bottom:.55rem}
+  .overlay-title{color:#fff;font:900 1.55rem "Barlow Condensed",sans-serif;letter-spacing:.04em;text-transform:uppercase}
+  .overlay-text{margin-top:.55rem;color:var(--muted);font-size:.87rem;line-height:1.55}
+  .overlay-statline{margin-top:.85rem;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.55rem}
+  .overlay-stat{border:1px solid rgba(53,102,120,.28);background:rgba(4,17,22,.82);padding:.55rem}.overlay-stat strong{display:block;color:#fff;font:900 1rem "Barlow Condensed",sans-serif}.overlay-stat span{color:var(--muted);font:.58rem var(--mono);letter-spacing:.12em;text-transform:uppercase}
+  .loading-overlay,#authGuard{position:fixed;inset:0;z-index:1500;display:flex;align-items:center;justify-content:center;background:rgba(2,7,10,.92);backdrop-filter:blur(10px);color:var(--text);font-family:var(--mono)}
+  .loading-inner{text-align:center}.loading-spinner{width:52px;height:52px;margin:0 auto 1rem;border:2px solid rgba(53,102,120,.36);border-top-color:var(--green);border-radius:50%;animation:spin .9s linear infinite}.loading-text{color:var(--green);font-size:.76rem;letter-spacing:.18em}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @media (max-width:1080px){body{overflow:auto}.layout{height:auto;min-height:calc(100vh - 72px);grid-template-columns:1fr;grid-template-rows:auto minmax(65vh,1fr)}.sidebar{border-right:none;border-bottom:1px solid var(--border)}.map-area{min-height:65vh}.map-overlay{top:auto;bottom:1rem}}
+  @media (max-width:720px){.topbar{height:auto;align-items:flex-start;gap:.9rem;padding:1rem;flex-direction:column}.layout{min-height:calc(100vh - 118px)}.map-toolbar{align-items:flex-start;flex-direction:column}.map-meta{width:100%;justify-content:flex-start}.overlay-statline{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
-
-<div id="authGuard">
-  <div style="text-align:center">
-    <div style="font-size:2rem;margin-bottom:1rem;opacity:.4">🔒</div>
-    Checking authentication...
-  </div>
-</div>
-
+<div id="authGuard"><div class="loading-inner"><div class="loading-spinner"></div><div class="loading-text">CHECKING AUTHENTICATION</div></div></div>
 <div class="topbar">
   <a class="logo" href="/">HEAT<span>TRACKER</span></a>
   <div class="topbar-right">
     <div class="identity">
-      <span class="discord-tag">
-        <svg width="12" height="12" viewBox="0 0 127.14 96.36" fill="currentColor">
-          <path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.09,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z"/>
-        </svg>
-        <span id="discordName">—</span>
-      </span>
-      <span class="vatsim-tag">CID: <span id="vatsimCid">—</span></span>
+      <span class="pill discord"><svg width="12" height="12" viewBox="0 0 127.14 96.36" fill="currentColor" aria-hidden="true"><path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.09,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z"/></svg><span id="discordName">-</span></span>
+      <span class="pill vatsim">CID: <span id="vatsimCid">-</span></span>
     </div>
-    <button class="btn-sm danger" onclick="unlinkVatsim()" title="Unlink VATSIM CID">Unlink</button>
+    <button class="btn-sm danger" onclick="unlinkVatsim()">Unlink</button>
     <a href="/auth/logout" class="btn-sm">Sign Out</a>
   </div>
 </div>
-
 <div class="layout">
   <aside class="sidebar">
-
-    <div class="sidebar-section">
-      <div class="section-label">Live Flight</div>
-      <div id="liveCard" class="offline-state">
-        <span class="ico">✈</span>Not currently flying on VATSIM
-      </div>
-    </div>
-
-    <div class="sidebar-section">
-      <div class="section-label">Statistics</div>
-      <div class="stats-grid">
-        <div class="stat-box">
-          <div class="stat-num" id="statPoints">—</div>
-          <div class="stat-label">Tracked Points</div>
-        </div>
-        <div class="stat-box">
-          <div class="stat-num" id="statFlights">—</div>
-          <div class="stat-label">Total Flights</div>
-        </div>
-      </div>
-    </div>
-
-    <div class="sidebar-section">
-      <div class="section-label">Top Routes</div>
-      <div id="topRoutes">
-        <div style="font-family:var(--mono);font-size:.72rem;color:var(--muted);text-align:center;padding:.9rem 0">No routes yet</div>
-      </div>
-    </div>
-
-    <div class="sidebar-section">
-      <div class="section-label">Recent Flights</div>
-      <div id="recentFlights">
-        <div style="font-family:var(--mono);font-size:.72rem;color:var(--muted);text-align:center;padding:.9rem 0">No flights recorded</div>
-      </div>
-    </div>
-
-    <div class="sidebar-footer">
-      <span>VATSIM HeatTracker</span>
-      <a href="https://anord.cc/legal" target="_blank" rel="noopener">Privacy &amp; Data</a>
-    </div>
-
+    <div class="sidebar-section"><div class="section-label">Live Flight</div><div id="liveCard" class="offline-state"><span class="ico">+</span>Not currently flying on VATSIM</div></div>
+    <div class="sidebar-section"><div class="section-label">Statistics</div><div class="stats-grid"><div class="stat-box"><div class="stat-num" id="statPoints">0</div><div class="stat-label">Tracked Points</div></div><div class="stat-box"><div class="stat-num" id="statFlights">0</div><div class="stat-label">Total Flights</div></div></div></div>
+    <div class="sidebar-section"><div class="section-label">Map Insights</div><div id="mapInsights"><div class="insight-row"><span>Stored segments</span><span class="insight-value" id="segmentCount">0</span></div><div class="insight-row"><span>Dense nodes</span><span class="insight-value" id="nodeCount">0</span></div><div class="insight-row"><span>Map range</span><span class="insight-value" id="mapRange">No data</span></div></div></div>
+    <div class="sidebar-section"><div class="section-label">Top Routes</div><div id="topRoutes"><div class="flight-meta" style="text-align:center;padding:.75rem 0">No routes yet</div></div></div>
+    <div class="sidebar-section"><div class="section-label">Recent Flights</div><div id="recentFlights"><div class="flight-meta" style="text-align:center;padding:.75rem 0">No flights recorded</div></div></div>
+    <div class="sidebar-footer"><span>VATSIM HeatTracker</span><a href="https://anord.cc/legal" target="_blank" rel="noopener">Privacy &amp; Data</a></div>
   </aside>
-
   <div class="map-area">
     <div class="map-toolbar">
-      <button class="map-btn active" id="btnHeat" onclick="setMode('heat')">Heatmap</button>
-      <button class="map-btn" id="btnLive" onclick="setMode('live')">Live Position</button>
+      <div class="mode-group"><button class="map-btn active" id="btnRoutes" onclick="setMode('routes')">Routes</button><button class="map-btn" id="btnDensity" onclick="setMode('density')">Density</button><button class="map-btn" id="btnLive" onclick="setMode('live')">Live</button></div>
+      <div class="base-group"><button class="map-btn active" id="btnDark" onclick="setBaseMap('dark')">Dark OSM</button><button class="map-btn" id="btnLight" onclick="setBaseMap('light')">OpenStreetMap</button></div>
       <div class="map-spacer"></div>
-      <div class="refresh-indicator">Next update in <span id="refreshCountdown">60</span>s</div>
+      <div class="map-meta"><div class="legend"><strong>Route glow</strong> shows flown corridors from stored track points.</div><div class="live-status"><strong id="liveStatusLabel">Standby</strong> <span id="liveStatusMeta">Waiting for live data</span></div><div class="refresh-indicator">Next update in <span id="refreshCountdown">15</span>s</div></div>
     </div>
     <div id="map"></div>
-    <div class="loading-overlay" id="loadingOverlay">
-      <div class="loading-spinner"></div>
-      <div class="loading-text">LOADING FLIGHT DATA</div>
-    </div>
+    <div class="map-overlay"><div class="overlay-label" id="overlayModeLabel">Route Network</div><div class="overlay-title" id="overlayTitle">Flown Corridors</div><div class="overlay-text" id="overlayText">Your historical track points are connected into bright corridors over OpenStreetMap data so repeated routes stand out immediately.</div><div class="overlay-statline"><div class="overlay-stat"><strong id="overlaySegments">0</strong><span>Segments</span></div><div class="overlay-stat"><strong id="overlayPoints">0</strong><span>Track Points</span></div><div class="overlay-stat"><strong id="overlayLive">Offline</strong><span>Live State</span></div></div></div>
+    <div class="loading-overlay" id="loadingOverlay"><div class="loading-inner"><div class="loading-spinner"></div><div class="loading-text">LOADING FLIGHT DATA</div></div></div>
   </div>
 </div>
-
 <script>
-let map, heatLayer, planeMarker;
-let currentMode = 'heat';
-let liveData = null;
-let countdown = 60, countdownTimer;
-
-function initMap() {
-  map = L.map('map', {center:[30,15], zoom:3, zoomControl:true, attributionControl:false});
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:18}).addTo(map);
-  heatLayer = L.heatLayer([], {
-    radius:22, blur:18, maxZoom:10,
-    gradient:{0:'#00c8ff', 0.4:'#00ffa3', 0.7:'#ffb700', 1:'#ff4d6d'},
-    max:5,
-  }).addTo(map);
-}
-
-async function checkAuth() {
-  const r = await fetch('/api/me', {credentials:'include'});
-  if (!r.ok) { window.location.href='/'; return false; }
-  const d = await r.json();
-  if (!d.authenticated) { window.location.href='/'; return false; }
-  if (!d.vatsim_id) { window.location.href='/link-vatsim'; return false; }
-
-  document.getElementById('discordName').textContent = d.discord_name || d.discord_id;
-  document.getElementById('vatsimCid').textContent   = d.vatsim_id;
-  document.getElementById('authGuard').style.display  = 'none';
-  return true;
-}
-
-async function loadHeatmap() {
-  const r = await fetch('/api/heatmap', {credentials:'include'});
-  if (!r.ok) return;
-  const data = await r.json();
-  const pts = (data.points||[]).map(p=>[p.lat,p.lng,p.weight]);
-  heatLayer.setLatLngs(pts);
-  if (pts.length>0 && currentMode==='heat') {
-    const lats=pts.map(p=>p[0]), lngs=pts.map(p=>p[1]);
-    map.fitBounds([[Math.min(...lats),Math.min(...lngs)],[Math.max(...lats),Math.max(...lngs)]],{padding:[40,40]});
-  }
-}
-
-async function loadLive() {
-  const r = await fetch('/api/live', {credentials:'include'});
-  if (!r.ok) return;
-  liveData = await r.json();
-
-  if (liveData.online) {
-    document.getElementById('liveCard').innerHTML = `
-      <div class="live-badge"><div class="pulse"></div> ONLINE NOW</div>
-      <div class="callsign">${liveData.callsign}</div>
-      <div class="route-line">
-        <span>${liveData.dep||'???'}</span><span class="arrow">──✈──</span><span>${liveData.arr||'???'}</span>
-      </div>
-      <div class="telemetry">
-        <div><span class="telem-label">Altitude</span><span class="telem-value hi">${(liveData.altitude||0).toLocaleString()} ft</span></div>
-        <div><span class="telem-label">Groundspeed</span><span class="telem-value hi">${liveData.groundspeed||0} kts</span></div>
-        <div><span class="telem-label">Heading</span><span class="telem-value">${liveData.heading||0}°</span></div>
-        <div><span class="telem-label">Aircraft</span><span class="telem-value">${liveData.aircraft||'—'}</span></div>
-      </div>
-    `;
-    const icon = L.divIcon({
-      className:'',
-      html:`<div class="plane-marker" style="transform:rotate(${liveData.heading||0}deg)">✈</div>`,
-      iconSize:[32,32], iconAnchor:[16,16],
-    });
-    if (!planeMarker) {
-      planeMarker = L.marker([liveData.lat,liveData.lng],{icon}).addTo(map);
-    } else {
-      planeMarker.setLatLng([liveData.lat,liveData.lng]);
-      planeMarker.setIcon(icon);
-    }
-    if (currentMode==='live') map.setView([liveData.lat,liveData.lng],7);
-  } else {
-    document.getElementById('liveCard').innerHTML = `
-      <div class="offline-state"><span class="ico">✈</span>Not currently flying on VATSIM</div>
-    `;
-    if (planeMarker) { map.removeLayer(planeMarker); planeMarker=null; }
-  }
-}
-
-async function loadStats() {
-  const r = await fetch('/api/stats', {credentials:'include'});
-  if (!r.ok) return;
-  const data = await r.json();
-  document.getElementById('statPoints').textContent  = (data.total_points||0).toLocaleString();
-  document.getElementById('statFlights').textContent = (data.total_flights||0).toLocaleString();
-  if (data.top_routes && data.top_routes.length) {
-    document.getElementById('topRoutes').innerHTML = data.top_routes.map(r=>`
-      <div class="route-item">
-        <span class="route-airports">${r.dep} → ${r.arr}</span>
-        <span class="route-count">${r.times}×</span>
-      </div>
-    `).join('');
-  }
-}
-
-async function loadFlights() {
-  const r = await fetch('/api/flights', {credentials:'include'});
-  if (!r.ok) return;
-  const data = await r.json();
-  if (data.flights && data.flights.length) {
-    document.getElementById('recentFlights').innerHTML = data.flights.slice(0,8).map(f=>`
-      <div class="flight-item">
-        <div class="flight-cs">${f.callsign||'—'}</div>
-        <div class="flight-meta">${f.dep||'???'} → ${f.arr||'???'} · ${f.aircraft||'—'}</div>
-        <div class="flight-meta" style="font-size:.58rem;margin-top:.1rem">${formatDate(f.started_at)}</div>
-      </div>
-    `).join('');
-  }
-}
-
-function formatDate(dt) {
-  if (!dt) return '—';
-  return new Date(dt+'Z').toLocaleString(undefined,{month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
-}
-
-function setMode(mode) {
-  currentMode = mode;
-  document.getElementById('btnHeat').classList.toggle('active', mode==='heat');
-  document.getElementById('btnLive').classList.toggle('active', mode==='live');
-  if (mode==='heat') {
-    heatLayer.addTo(map);
-  } else {
-    if (liveData && liveData.online) {
-      if (planeMarker) planeMarker.addTo(map);
-      map.setView([liveData.lat, liveData.lng], 7);
-    } else {
-      alert('You are not currently flying on VATSIM.');
-      setMode('heat');
-    }
-  }
-}
-
-async function unlinkVatsim() {
-  if (!confirm('Unlink your VATSIM CID? You will need to re-link before using the tracker again.')) return;
-  await fetch('/api/unlink-vatsim', {method:'POST', credentials:'include'});
-  window.location.href = '/link-vatsim';
-}
-
-function startCountdown() {
-  clearInterval(countdownTimer);
-  countdown = 60;
-  countdownTimer = setInterval(() => {
-    countdown--;
-    document.getElementById('refreshCountdown').textContent = countdown;
-    if (countdown <= 0) { refreshAll(); countdown = 60; }
-  }, 1000);
-}
-
-async function refreshAll() {
-  await Promise.all([loadLive(), loadHeatmap(), loadStats(), loadFlights()]);
-}
-
-(async () => {
-  initMap();
-  const ok = await checkAuth();
-  if (!ok) return;
-  await refreshAll();
-  document.getElementById('loadingOverlay').style.display = 'none';
-  startCountdown();
-})();
+const REFRESH_INTERVAL_SECONDS=15;
+let map,currentMode="routes",currentBaseMap="dark",liveData=null,heatmapData={points:[],segments:[],recent_track:[],bounds:null,totals:{track_points:0,segments:0}},countdown=REFRESH_INTERVAL_SECONDS,countdownTimer=null;
+const layerStore={base:{},routeGlow:L.layerGroup(),routeLines:L.layerGroup(),routeNodes:L.layerGroup(),density:L.layerGroup(),recentTrail:L.layerGroup(),plane:L.layerGroup()};
+function initMap(){map=L.map("map",{center:[20,10],zoom:3,zoomControl:true,attributionControl:true,worldCopyJump:true});layerStore.base.dark=L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",{subdomains:"abcd",maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; CARTO'});layerStore.base.light=L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'});layerStore.base.dark.addTo(map);layerStore.routeGlow.addTo(map);layerStore.routeLines.addTo(map);layerStore.routeNodes.addTo(map)}
+function escapeHtml(value){return String(value??"").replace(/[&<>\"']/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]))}
+async function checkAuth(){const response=await fetch("/api/me",{credentials:"include"});if(!response.ok){window.location.href="/";return false}const data=await response.json();if(!data.authenticated){window.location.href="/";return false}if(!data.vatsim_id){window.location.href="/link-vatsim";return false}document.getElementById("discordName").textContent=data.discord_name||data.discord_id;document.getElementById("vatsimCid").textContent=data.vatsim_id;document.getElementById("authGuard").style.display="none";return true}
+function createDotIcon(className,size){return L.divIcon({className:"",html:`<div class="${className}" style="width:${size}px;height:${size}px"></div>`,iconSize:[size,size],iconAnchor:[size/2,size/2]})}
+function updateOverlay(){const modes={routes:{label:"Route Network",title:"Flown Corridors",text:"Your stored position history is connected into luminous corridors so repeated flights read like a real route network."},density:{label:"Density Map",title:"Hotspots",text:"Repeatedly flown locations are emphasized as brighter and larger nodes, making hubs and favorite airways stand out."},live:{label:"Live Position",title:liveData&&liveData.online?(liveData.callsign||"Active Flight"):"Awaiting Flight",text:liveData&&liveData.online?`Tracking ${liveData.dep||"???"} to ${liveData.arr||"???"} live on top of your OpenStreetMap route history.`:"When you connect to VATSIM, your current aircraft and recent trail will appear here automatically."}};const selected=modes[currentMode];document.getElementById("overlayModeLabel").textContent=selected.label;document.getElementById("overlayTitle").textContent=selected.title;document.getElementById("overlayText").textContent=selected.text;document.getElementById("overlaySegments").textContent=(heatmapData.totals?.segments||0).toLocaleString();document.getElementById("overlayPoints").textContent=(heatmapData.totals?.track_points||0).toLocaleString();document.getElementById("overlayLive").textContent=liveData&&liveData.online?"Online":"Offline"}
+function updateLiveStatus(){const label=document.getElementById("liveStatusLabel"),meta=document.getElementById("liveStatusMeta");if(liveData&&liveData.online){label.textContent="Live now";meta.textContent=`${liveData.callsign||"Flight"} ${liveData.dep||"???"} -> ${liveData.arr||"???"}`}else{label.textContent="Standby";meta.textContent="No active VATSIM flight detected"}}
+function applyModeLayers(){const routeMode=currentMode==="routes",densityMode=currentMode==="density",liveMode=currentMode==="live";const toggle=(group,visible)=>{if(visible){if(!map.hasLayer(group))group.addTo(map)}else if(map.hasLayer(group))map.removeLayer(group)};toggle(layerStore.routeGlow,routeMode||liveMode);toggle(layerStore.routeLines,routeMode||liveMode);toggle(layerStore.routeNodes,routeMode);toggle(layerStore.density,densityMode);toggle(layerStore.recentTrail,liveMode);toggle(layerStore.plane,liveMode);document.getElementById("btnRoutes").classList.toggle("active",routeMode);document.getElementById("btnDensity").classList.toggle("active",densityMode);document.getElementById("btnLive").classList.toggle("active",liveMode);updateOverlay()}
+function renderHistoryMap(){layerStore.routeGlow.clearLayers();layerStore.routeLines.clearLayers();layerStore.routeNodes.clearLayers();layerStore.density.clearLayers();layerStore.recentTrail.clearLayers();const segments=heatmapData.segments||[],points=heatmapData.points||[],recentTrack=heatmapData.recent_track||[];segments.forEach((segment)=>{L.polyline(segment,{color:"#ffffff",weight:6,opacity:.08,smoothFactor:1.2}).addTo(layerStore.routeGlow);L.polyline(segment,{color:"#f4f7fb",weight:1.25,opacity:.5,smoothFactor:1.2}).addTo(layerStore.routeLines)});points.filter((point)=>point.weight>=2).slice(0,800).forEach((point)=>{const nodeSize=Math.min(10,3+point.weight*.9);L.marker([point.lat,point.lng],{icon:createDotIcon("route-node",nodeSize)}).addTo(layerStore.routeNodes)});points.slice().sort((a,b)=>b.weight-a.weight).slice(0,500).forEach((point)=>{const size=Math.min(42,12+point.weight*2.3);L.marker([point.lat,point.lng],{icon:createDotIcon("density-node",size)}).addTo(layerStore.density)});if(recentTrack.length>1){L.polyline(recentTrack.map((point)=>[point.lat,point.lng]),{color:"#1dffb2",weight:2.4,opacity:.9,dashArray:"8 10"}).addTo(layerStore.recentTrail)}document.getElementById("segmentCount").textContent=(heatmapData.totals?.segments||0).toLocaleString();document.getElementById("nodeCount").textContent=(points.length||0).toLocaleString();if(heatmapData.bounds){const sw=heatmapData.bounds.southWest,ne=heatmapData.bounds.northEast;document.getElementById("mapRange").textContent=`${sw[0].toFixed(1)} to ${ne[0].toFixed(1)} lat`}else document.getElementById("mapRange").textContent="No data";applyModeLayers()}
+function syncPlaneMarker(){layerStore.plane.clearLayers();if(!liveData||!liveData.online){updateOverlay();return}const planeIcon=L.divIcon({className:"",html:`<div class="plane-marker" style="transform: rotate(${Number(liveData.heading||0)}deg)">&#9992;</div>`,iconSize:[40,40],iconAnchor:[20,20]});L.marker([liveData.lat,liveData.lng],{icon:createDotIcon("live-node",22),interactive:false}).addTo(layerStore.plane);L.marker([liveData.lat,liveData.lng],{icon:planeIcon}).bindPopup(`<strong>${escapeHtml(liveData.callsign||"Live Flight")}</strong><br>${escapeHtml(liveData.dep||"???")} to ${escapeHtml(liveData.arr||"???")}<br>${Number(liveData.altitude||0).toLocaleString()} ft / ${Number(liveData.groundspeed||0)} kts`).addTo(layerStore.plane);updateOverlay()}
+function fitMapToData(preferLive=false){if(preferLive&&liveData&&liveData.online){map.setView([liveData.lat,liveData.lng],6);return}if(heatmapData.bounds){map.fitBounds([heatmapData.bounds.southWest,heatmapData.bounds.northEast],{padding:[50,50],maxZoom:6});return}map.setView([20,10],2)}
+async function loadHeatmap(){const response=await fetch("/api/heatmap",{credentials:"include"});if(!response.ok)return;heatmapData=await response.json();renderHistoryMap()}
+async function loadLive(){const response=await fetch("/api/live",{credentials:"include"});if(!response.ok)return;liveData=await response.json();if(liveData.online){document.getElementById("liveCard").innerHTML=`<div class="live-card"><div class="live-badge"><div class="pulse"></div> ONLINE NOW</div><div class="callsign">${escapeHtml(liveData.callsign||"ACTIVE")}</div><div class="route-line"><span>${escapeHtml(liveData.dep||"???")}</span><span class="arrow">--&gt;</span><span>${escapeHtml(liveData.arr||"???")}</span></div><div class="telemetry"><div><span class="telem-label">Altitude</span><span class="telem-value hi">${Number(liveData.altitude||0).toLocaleString()} ft</span></div><div><span class="telem-label">Groundspeed</span><span class="telem-value hi">${Number(liveData.groundspeed||0)} kts</span></div><div><span class="telem-label">Heading</span><span class="telem-value">${Number(liveData.heading||0)} deg</span></div><div><span class="telem-label">Aircraft</span><span class="telem-value">${escapeHtml(liveData.aircraft||"-")}</span></div></div></div>`}else{document.getElementById("liveCard").innerHTML=`<div class="offline-state"><span class="ico">+</span>Not currently flying on VATSIM</div>`}updateLiveStatus();syncPlaneMarker()}
+async function loadStats(){const response=await fetch("/api/stats",{credentials:"include"});if(!response.ok)return;const data=await response.json();document.getElementById("statPoints").textContent=Number(data.total_points||0).toLocaleString();document.getElementById("statFlights").textContent=Number(data.total_flights||0).toLocaleString();document.getElementById("topRoutes").innerHTML=data.top_routes&&data.top_routes.length?data.top_routes.map((route)=>`<div class="route-item"><span class="route-airports">${escapeHtml(route.dep)} -&gt; ${escapeHtml(route.arr)}</span><span class="route-count">${Number(route.times||0)}x</span></div>`).join(""):`<div class="flight-meta" style="text-align:center;padding:.75rem 0">No routes yet</div>`}
+function formatDate(value){if(!value)return"-";const normalized=value.includes("T")?value:`${value}Z`;const date=new Date(normalized);if(Number.isNaN(date.getTime()))return value;return date.toLocaleString(undefined,{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})}
+async function loadFlights(){const response=await fetch("/api/flights",{credentials:"include"});if(!response.ok)return;const data=await response.json();document.getElementById("recentFlights").innerHTML=data.flights&&data.flights.length?data.flights.slice(0,8).map((flight)=>`<div class="flight-item"><div class="flight-cs">${escapeHtml(flight.callsign||"-")}</div><div class="flight-meta">${escapeHtml(flight.dep||"???")} -&gt; ${escapeHtml(flight.arr||"???")} · ${escapeHtml(flight.aircraft||"-")}</div><div class="flight-meta" style="margin-top:.15rem">${formatDate(flight.started_at)}</div></div>`).join(""):`<div class="flight-meta" style="text-align:center;padding:.75rem 0">No flights recorded</div>`}
+function setMode(mode){currentMode=mode;applyModeLayers();fitMapToData(mode==="live")}
+function setBaseMap(mode){if(currentBaseMap===mode)return;map.removeLayer(layerStore.base[currentBaseMap]);currentBaseMap=mode;layerStore.base[currentBaseMap].addTo(map);document.getElementById("btnDark").classList.toggle("active",mode==="dark");document.getElementById("btnLight").classList.toggle("active",mode==="light")}
+async function unlinkVatsim(){if(!confirm("Unlink your VATSIM CID? You will need to re-link before using the tracker again."))return;await fetch("/api/unlink-vatsim",{method:"POST",credentials:"include"});window.location.href="/link-vatsim"}
+function startCountdown(){clearInterval(countdownTimer);countdown=REFRESH_INTERVAL_SECONDS;document.getElementById("refreshCountdown").textContent=countdown;countdownTimer=setInterval(()=>{countdown-=1;document.getElementById("refreshCountdown").textContent=countdown;if(countdown<=0){refreshAll();countdown=REFRESH_INTERVAL_SECONDS}},1000)}
+async function refreshAll(){await Promise.all([loadLive(),loadHeatmap(),loadStats(),loadFlights()]);fitMapToData(currentMode==="live")}
+(async()=>{initMap();const ok=await checkAuth();if(!ok)return;await refreshAll();document.getElementById("loadingOverlay").style.display="none";startCountdown()})();
 </script>
 </body>
 </html>

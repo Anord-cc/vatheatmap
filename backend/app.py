@@ -1,12 +1,17 @@
+import math
 import os
-import time
-import sqlite3
-import requests
 import secrets
+import sqlite3
+import time
 from functools import wraps
-from flask import Flask, redirect, request, session, jsonify, send_from_directory
-from flask_cors import CORS
 from urllib.parse import urlencode
+
+import requests
+from dotenv import load_dotenv
+from flask import Flask, jsonify, redirect, request, send_from_directory, session
+from flask_cors import CORS
+
+load_dotenv()
 
 app = Flask(__name__, static_folder="../frontend/static", template_folder="../frontend/templates")
 app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
@@ -16,22 +21,27 @@ CORS(app, supports_credentials=True)
 DISCORD_AUTH_URL      = "https://discord.com/oauth2/authorize"
 DISCORD_TOKEN_URL     = "https://discord.com/api/oauth2/token"
 DISCORD_USER_URL      = "https://discord.com/api/users/@me"
-DISCORD_CLIENT_ID     = os.environ.get("DISCORD_CLIENT_ID", "YOUR_DISCORD_CLIENT_ID")
-DISCORD_CLIENT_SECRET = os.environ.get("DISCORD_CLIENT_SECRET", "YOUR_DISCORD_CLIENT_SECRET")
-DISCORD_REDIRECT_URI  = os.environ.get("DISCORD_REDIRECT_URI", "http://localhost:5000/auth/callback")
+DISCORD_CLIENT_ID     = os.environ.get("DISCORD_CLIENT_ID")
+DISCORD_CLIENT_SECRET = os.environ.get("DISCORD_CLIENT_SECRET")
+DISCORD_REDIRECT_URI  = os.environ.get("DISCORD_REDIRECT_URI")
 
 # ── Allowlist — only these Discord user IDs may log in ───────────────────────
 ALLOWED_DISCORD_IDS = {
-    "396397499339767810",
+    discord_id.strip()
+    for discord_id in (os.environ.get("ALLOWED_DISCORD_IDS") or "").split(",")
+    if discord_id.strip()
 }
 
 # ── VATSIM public data feed ───────────────────────────────────────────────────
 VATSIM_DATA_URL = "https://data.vatsim.net/v3/vatsim-data.json"
 _vatsim_cache   = {"data": None, "fetched_at": 0}
+VATSIM_CACHE_TTL_SECONDS = max(5, int(os.environ.get("VATSIM_CACHE_TTL_SECONDS", "15")))
+MAX_SEGMENT_GAP_SECONDS = 60 * 60 * 4
+MAX_SEGMENT_DISTANCE_KM = 900
 
 def get_vatsim_data():
     now = time.time()
-    if now - _vatsim_cache["fetched_at"] < 60:
+    if now - _vatsim_cache["fetched_at"] < VATSIM_CACHE_TTL_SECONDS:
         return _vatsim_cache["data"]
     try:
         r = requests.get(VATSIM_DATA_URL, timeout=10)
@@ -50,6 +60,79 @@ def find_pilot(vatsim_id: str):
         if str(pilot.get("cid")) == str(vatsim_id):
             return pilot
     return None
+
+
+def close_active_flight(conn, vatsim_id: str):
+    conn.execute(
+        """
+        UPDATE flights
+        SET ended_at = CURRENT_TIMESTAMP
+        WHERE vatsim_id = ? AND ended_at IS NULL
+        """,
+        (vatsim_id,),
+    )
+
+
+def great_circle_distance_km(lat1, lng1, lat2, lng2):
+    radius_km = 6371.0
+    phi1 = math.radians(lat1)
+    phi2 = math.radians(lat2)
+    delta_phi = math.radians(lat2 - lat1)
+    delta_lambda = math.radians(lng2 - lng1)
+
+    a = (
+        math.sin(delta_phi / 2) ** 2
+        + math.cos(phi1) * math.cos(phi2) * math.sin(delta_lambda / 2) ** 2
+    )
+    return 2 * radius_km * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+
+def should_split_segment(previous, current):
+    if previous is None:
+        return True
+
+    prev_ts = previous["recorded_unix"] or 0
+    curr_ts = current["recorded_unix"] or 0
+    if curr_ts - prev_ts > MAX_SEGMENT_GAP_SECONDS:
+        return True
+
+    distance_km = great_circle_distance_km(
+        previous["lat"], previous["lng"], current["lat"], current["lng"]
+    )
+    return distance_km > MAX_SEGMENT_DISTANCE_KM
+
+
+def build_track_segments(rows):
+    segments = []
+    points = []
+    current_segment = []
+    previous = None
+
+    for row in rows:
+        point = {
+            "lat": row["lat"],
+            "lng": row["lng"],
+            "callsign": row["callsign"],
+            "altitude": row["altitude"],
+            "groundspeed": row["groundspeed"],
+            "recorded_at": row["recorded_at"],
+            "recorded_unix": row["recorded_unix"],
+        }
+        points.append(point)
+
+        if should_split_segment(previous, point):
+            if len(current_segment) > 1:
+                segments.append(current_segment)
+            current_segment = [[point["lat"], point["lng"]]]
+        else:
+            current_segment.append([point["lat"], point["lng"]])
+
+        previous = point
+
+    if len(current_segment) > 1:
+        segments.append(current_segment)
+
+    return points, segments
 
 # ── Database ──────────────────────────────────────────────────────────────────
 DB_PATH = os.path.join(os.path.dirname(__file__), "flights.db")
@@ -253,6 +336,8 @@ def live_flight():
     pilot = find_pilot(vatsim_id)
 
     if not pilot:
+        with get_db() as conn:
+            close_active_flight(conn, vatsim_id)
         return jsonify({"online": False})
 
     with get_db() as conn:
@@ -300,8 +385,47 @@ def heatmap():
             FROM flight_points WHERE vatsim_id = ?
             GROUP BY ROUND(lat,2), ROUND(lng,2)
         """, (vatsim_id,)).fetchall()
+        track_rows = conn.execute(
+            """
+            SELECT
+                callsign,
+                lat,
+                lng,
+                altitude,
+                groundspeed,
+                recorded_at,
+                CAST(strftime('%s', recorded_at) AS INTEGER) AS recorded_unix
+            FROM flight_points
+            WHERE vatsim_id = ?
+            ORDER BY recorded_at ASC, id ASC
+            """,
+            (vatsim_id,),
+        ).fetchall()
+
+    ordered_points, segments = build_track_segments(track_rows)
+    recent_track = [
+        {"lat": point["lat"], "lng": point["lng"], "recorded_at": point["recorded_at"]}
+        for point in ordered_points[-120:]
+    ]
+
+    bounds = None
+    if ordered_points:
+        latitudes = [point["lat"] for point in ordered_points]
+        longitudes = [point["lng"] for point in ordered_points]
+        bounds = {
+            "southWest": [min(latitudes), min(longitudes)],
+            "northEast": [max(latitudes), max(longitudes)],
+        }
+
     return jsonify({
-        "points": [{"lat": r["lat"], "lng": r["lng"], "weight": r["weight"]} for r in rows]
+        "points": [{"lat": r["lat"], "lng": r["lng"], "weight": r["weight"]} for r in rows],
+        "segments": segments,
+        "recent_track": recent_track,
+        "bounds": bounds,
+        "totals": {
+            "track_points": len(ordered_points),
+            "segments": len(segments),
+        },
     })
 
 @app.route("/api/flights")
