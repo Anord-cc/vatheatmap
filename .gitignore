@@ -20,3 +20,5 @@ backend/__pycache__/
 src/SimpleSimConnector
 backend/app-backup.py
 backend/simconnect-state.json"/backend/simconnect-state.json" 
+/backend/simconnect-state.json
+/Virtual Airline data/
