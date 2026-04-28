@@ -171,3 +171,9 @@ The app runs on:
 - Set `PASSKEY_RP_ID` and `PASSKEY_ORIGIN` to the production domain
 - Serve over HTTPS, especially for passkeys
 - Keep `ALLOWED_DISCORD_IDS` restricted to the users who should access the tracker
+
+## License Notice
+
+All source files in this repository, including C#, HTML, CSS, JavaScript, and documentation, are licensed under the PolyForm Noncommercial License 1.0.0 unless otherwise stated.
+
+Commercial use is prohibited without written permission from the copyright holder.
