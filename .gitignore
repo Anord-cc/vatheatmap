@@ -1,8 +1,12 @@
 # Exclude environment variables
 .env
-# Exclude the SQLite database
+# Exclude the SQLite / local database files
 flights.db
 roadmap.html
+*.db
+*.sqlite
+*.sqlite3
+backend/*.db
 
 # Optional: Exclude any temporary WAL (Write-Ahead Logging) files SQLite creates
 flights.db-journal
