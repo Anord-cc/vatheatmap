@@ -3,6 +3,7 @@
 // Commercial use is prohibited without written permission.
 using Microsoft.FlightSimulator.SimConnect;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Globalization;
@@ -21,39 +22,114 @@ namespace SimpleSimConnector
 {
     enum DEFINITIONS
     {
+        Identity,
         Telemetry
     }
 
     enum REQUESTS
     {
+        Identity,
         Telemetry
+    }
+
+    enum EVENTS
+    {
+        Frame
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
+    struct IdentityData
+    {
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
+        public string title;
     }
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Ansi, Pack = 1)]
     struct Telemetry
     {
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
-        public string title;
-
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
-        public string atcId;
-
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
-        public string atcAirline;
-
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
-        public string atcFlightNumber;
-
-        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
-        public string atcModel;
-
         public double latitude;
         public double longitude;
-        public double altitude;
-        public double groundSpeed;
-        public double heading;
+        public double altitudeMeters;
+        public double groundSpeedMetersPerSecond;
+        public double headingTrueDegrees;
+        public double headingMagneticDegrees;
         public double onGround;
-        public double verticalSpeed;
+        public double verticalSpeedMetersPerSecond;
+        public double pitchDegrees;
+        public double bankDegrees;
+        public double gForce;
+        public double groundElevationMeters;
+        public double landingRateMetersPerSecond;
+        public double indicatedAirspeedMetersPerSecond;
+        public double trueAirspeedMetersPerSecond;
+        public double barberPoleAirspeedMetersPerSecond;
+        public double parkingBrake;
+        public double numFlapPositions;
+        public double gearDown;
+        public double lightNavigation;
+        public double lightBeacon;
+        public double lightStrobes;
+        public double lightInstruments;
+        public double lightLogo;
+        public double lightCabin;
+        public double com1Frequency;
+        public double com2Frequency;
+        public double nav1Frequency;
+        public double nav2Frequency;
+        public double transponderCode;
+        public double engineType;
+        public double itt1DegreesCelsius;
+        public double itt2DegreesCelsius;
+        public double antiIce1Enabled;
+        public double antiIce2Enabled;
+        public double exitOpen;
+        public double apuPctRpm;
+        public double apuSwitch;
+        public double apuGeneratorActive;
+        public double fuelWeightPerGallon;
+        public double fuelTankCenterCapacityGallons;
+        public double fuelTankCenterQuantityGallons;
+        public double fuelTankCenter2CapacityGallons;
+        public double fuelTankCenter2QuantityGallons;
+        public double fuelTankCenter3CapacityGallons;
+        public double fuelTankCenter3QuantityGallons;
+        public double fuelTankLeftMainCapacityGallons;
+        public double fuelTankLeftMainQuantityGallons;
+        public double fuelTankLeftAuxCapacityGallons;
+        public double fuelTankLeftAuxQuantityGallons;
+        public double fuelTankLeftTipCapacityGallons;
+        public double fuelTankLeftTipQuantityGallons;
+        public double fuelTankRightMainCapacityGallons;
+        public double fuelTankRightMainQuantityGallons;
+        public double fuelTankRightAuxCapacityGallons;
+        public double fuelTankRightAuxQuantityGallons;
+        public double fuelTankRightTipCapacityGallons;
+        public double fuelTankRightTipQuantityGallons;
+        public double fuelTankExternal1CapacityGallons;
+        public double fuelTankExternal1QuantityGallons;
+        public double fuelTankExternal2CapacityGallons;
+        public double fuelTankExternal2QuantityGallons;
+        public double outsideAirTemperatureCelsius;
+        public double visibilityMeters;
+        public double windSpeedKnots;
+        public double windDirectionDegrees;
+        public double ambientPressureInchesHg;
+        public double seaLevelPressurePascal;
+        public double barometerSettingMillibars;
+        public double cabinAltitudeMeters;
+        public double yawDamperEnabled;
+        public double flightDirectorEnabled;
+        public double autopilotAirspeedHoldKnots;
+        public double autopilotMachHoldMach;
+        public double autopilotAltitudeHoldFeet;
+        public double autopilotHeadingLockDegrees;
+        public double autopilotPitchHoldRadians;
+        public double autopilotVerticalSpeedHoldFeetPerMinute;
+        public double autopilotAltitudeHoldActive;
+        public double autopilotHeadingLockActive;
+        public double autopilotAirspeedHoldActive;
+        public double autopilotMachHoldActive;
+        public double autopilotVerticalSpeedHoldActive;
     }
 
     class ConnectorSettings
@@ -161,6 +237,12 @@ namespace SimpleSimConnector
 
         private readonly object latestJsonLock = new object();
         private string latestJson;
+        private bool backendConnected = false;
+        private double latestFrameRate = double.NaN;
+        private double latestSimulationRate = double.NaN;
+        private string latestAircraftTitle = "";
+        private readonly List<string> identityDefinitionNames = new List<string>();
+        private readonly List<string> telemetryDefinitionNames = new List<string>();
 
         private static readonly HttpClient http = new HttpClient
         {
@@ -674,24 +756,7 @@ namespace SimpleSimConnector
                 }
             }
 
-            return
-                "{" +
-                    "\"online\":true," +
-                    "\"connected\":false," +
-                    "\"latitude\":null," +
-                    "\"longitude\":null," +
-                    "\"altitude\":null," +
-                    "\"groundspeed\":null," +
-                    "\"heading\":null," +
-                    "\"callsign\":\"SIMCONNECT\"," +
-                    "\"flight_plan\":{" +
-                        "\"departure\":null," +
-                        "\"arrival\":null," +
-                        "\"aircraft_short\":\"UNKNOWN\"" +
-                    "}," +
-                    "\"source\":\"simconnect-bridge\"," +
-                    "\"last_error\":\"No telemetry received yet\"" +
-                "}";
+            return BuildStatusJson(false, "No telemetry received yet");
         }
 
         private void ConnectToSim()
@@ -709,6 +774,7 @@ namespace SimpleSimConnector
                 simconnect.OnRecvOpen += OnSimConnected;
                 simconnect.OnRecvQuit += OnSimQuit;
                 simconnect.OnRecvException += OnSimException;
+                simconnect.OnRecvEventFrame += OnFrameEvent;
                 simconnect.OnRecvSimobjectData += OnTelemetryReceived;
 
                 Log("SimConnect object created.");
@@ -740,22 +806,37 @@ namespace SimpleSimConnector
 
             Log("Connected to MSFS.");
             SetStatus("Connected to MSFS. Requesting telemetry...");
+            identityDefinitionNames.Clear();
+            telemetryDefinitionNames.Clear();
+            latestAircraftTitle = "";
 
-            AddStringSimVar("Title");
-            AddStringSimVar("ATC ID");
-            AddStringSimVar("ATC AIRLINE");
-            AddStringSimVar("ATC FLIGHT NUMBER");
-            AddStringSimVar("ATC MODEL");
+            TelemetryBridgeCatalog.ValidateStructOrder<IdentityData>(TelemetryBridgeCatalog.IdentityDefinitions);
+            TelemetryBridgeCatalog.ValidateStructOrder<Telemetry>(TelemetryBridgeCatalog.NumericDefinitions);
 
-            AddFloatSimVar("Plane Latitude", "degrees");
-            AddFloatSimVar("Plane Longitude", "degrees");
-            AddFloatSimVar("Plane Altitude", "feet");
-            AddFloatSimVar("GROUND VELOCITY", "knots");
-            AddFloatSimVar("PLANE HEADING DEGREES TRUE", "degrees");
-            AddFloatSimVar("SIM ON GROUND", "bool");
-            AddFloatSimVar("VERTICAL SPEED", "feet per minute");
+            foreach (SimVarDefinition definition in TelemetryBridgeCatalog.IdentityDefinitions)
+            {
+                AddDefinition(DEFINITIONS.Identity, identityDefinitionNames, definition);
+            }
 
+            foreach (SimVarDefinition definition in TelemetryBridgeCatalog.NumericDefinitions)
+            {
+                AddDefinition(DEFINITIONS.Telemetry, telemetryDefinitionNames, definition);
+            }
+
+            simconnect.RegisterDataDefineStruct<IdentityData>(DEFINITIONS.Identity);
             simconnect.RegisterDataDefineStruct<Telemetry>(DEFINITIONS.Telemetry);
+            simconnect.SubscribeToSystemEvent(EVENTS.Frame, "Frame");
+
+            simconnect.RequestDataOnSimObject(
+                REQUESTS.Identity,
+                DEFINITIONS.Identity,
+                SimConnect.SIMCONNECT_OBJECT_ID_USER,
+                SIMCONNECT_PERIOD.ONCE,
+                SIMCONNECT_DATA_REQUEST_FLAG.DEFAULT,
+                0,
+                0,
+                0
+            );
 
             simconnect.RequestDataOnSimObject(
                 REQUESTS.Telemetry,
@@ -772,33 +853,46 @@ namespace SimpleSimConnector
             SetStatus("Connected. Telemetry request started.");
         }
 
-        private void AddStringSimVar(string name)
+        private void AddDefinition(DEFINITIONS target, List<string> definitionNames, SimVarDefinition definition)
         {
+            definitionNames.Add(definition.SimVarName);
+
             simconnect.AddToDataDefinition(
-                DEFINITIONS.Telemetry,
-                name,
-                null,
-                SIMCONNECT_DATATYPE.STRING256,
+                target,
+                definition.SimVarName,
+                definition.SimConnectUnit,
+                definition.IsString ? SIMCONNECT_DATATYPE.STRING256 : SIMCONNECT_DATATYPE.FLOAT64,
                 0,
                 SimConnect.SIMCONNECT_UNUSED
             );
         }
 
-        private void AddFloatSimVar(string name, string unit)
+        private void OnFrameEvent(SimConnect sender, SIMCONNECT_RECV_EVENT_FRAME data)
         {
-            simconnect.AddToDataDefinition(
-                DEFINITIONS.Telemetry,
-                name,
-                unit,
-                SIMCONNECT_DATATYPE.FLOAT64,
-                0,
-                SimConnect.SIMCONNECT_UNUSED
-            );
+            latestFrameRate = data.fFrameRate;
+            latestSimulationRate = data.fSimSpeed;
         }
 
         private async void OnTelemetryReceived(SimConnect sender, SIMCONNECT_RECV_SIMOBJECT_DATA data)
         {
-            if ((REQUESTS)data.dwRequestID != REQUESTS.Telemetry)
+            REQUESTS request = (REQUESTS)data.dwRequestID;
+
+            if (request == REQUESTS.Identity)
+            {
+                try
+                {
+                    var identity = (IdentityData)data.dwData[0];
+                    latestAircraftTitle = Clean(identity.title);
+                }
+                catch (Exception ex)
+                {
+                    Log("Identity handling error: " + ex.Message);
+                }
+
+                return;
+            }
+
+            if (request != REQUESTS.Telemetry)
             {
                 return;
             }
@@ -809,6 +903,7 @@ namespace SimpleSimConnector
 
                 string json = BuildBackendJson(
                     telemetry,
+                    latestAircraftTitle,
                     connected: true,
                     lastError: null
                 );
@@ -843,6 +938,7 @@ namespace SimpleSimConnector
             {
                 var content = new StringContent(json, Encoding.UTF8, "application/json");
                 var response = await http.PostAsync(settings.BackendUrl, content);
+                backendConnected = response.IsSuccessStatusCode;
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -851,30 +947,14 @@ namespace SimpleSimConnector
             }
             catch (Exception ex)
             {
+                backendConnected = false;
                 Log("Backend upload failed: " + ex.Message);
             }
         }
 
         private async void SendStatusPayload(bool connected, string lastError)
         {
-            string json =
-                "{" +
-                    "\"online\":true," +
-                    "\"connected\":" + Bool(connected) + "," +
-                    "\"latitude\":null," +
-                    "\"longitude\":null," +
-                    "\"altitude\":null," +
-                    "\"groundspeed\":null," +
-                    "\"heading\":null," +
-                    "\"callsign\":\"SIMCONNECT\"," +
-                    "\"flight_plan\":{" +
-                        "\"departure\":null," +
-                        "\"arrival\":null," +
-                        "\"aircraft_short\":\"UNKNOWN\"" +
-                    "}," +
-                    "\"source\":\"simconnect-bridge\"," +
-                    "\"last_error\":" + JsonStringOrNull(lastError) +
-                "}";
+            string json = BuildStatusJson(connected, lastError);
 
             lock (latestJsonLock)
             {
@@ -905,6 +985,24 @@ namespace SimpleSimConnector
         private void OnSimException(SimConnect sender, SIMCONNECT_RECV_EXCEPTION data)
         {
             string message = "SimConnect exception: " + data.dwException;
+            if (data.dwIndex > 0)
+            {
+                int definitionIndex = (int)data.dwIndex - 1;
+                if (definitionIndex >= 0 && definitionIndex < telemetryDefinitionNames.Count)
+                {
+                    message += " at telemetry definition #" + data.dwIndex + " (" + telemetryDefinitionNames[definitionIndex] + ")";
+                }
+                else
+                {
+                    message += " at telemetry definition #" + data.dwIndex;
+                }
+            }
+
+            if (data.dwSendID > 0)
+            {
+                message += " sendId=" + data.dwSendID;
+            }
+
             Log(message);
             SetStatus(message);
 
@@ -980,67 +1078,244 @@ namespace SimpleSimConnector
             simconnect = null;
         }
 
-        private string BuildBackendJson(Telemetry t, bool connected, string lastError)
+        private string BuildStatusJson(bool connectedToSimulator, string lastError)
         {
-            string callsign = BuildCallsign(t);
-            string aircraftShort = BuildAircraftShort(t);
-
-            double groundspeed = ZeroNoise(t.groundSpeed, 0.01);
-            double heading = NormalizeHeading(t.heading);
-
-            return "{" +
-                "\"online\":true," +
-                "\"connected\":" + Bool(connected) + "," +
-                "\"latitude\":" + Num(t.latitude) + "," +
-                "\"longitude\":" + Num(t.longitude) + "," +
-                "\"altitude\":" + Num(t.altitude) + "," +
-                "\"groundspeed\":" + Num(groundspeed) + "," +
-                "\"heading\":" + Num(heading) + "," +
-                "\"callsign\":\"" + Escape(callsign) + "\"," +
-                "\"flight_plan\":{" +
-                    "\"departure\":null," +
-                    "\"arrival\":null," +
-                    "\"aircraft_short\":\"" + Escape(aircraftShort) + "\"" +
-                "}," +
-                "\"source\":\"simconnect-bridge\"," +
-                "\"last_error\":" + JsonStringOrNull(lastError) +
-            "}";
+            var sb = new StringBuilder(2048);
+            sb.Append("{");
+            sb.Append("\"online\":").Append(Bool(connectedToSimulator)).Append(",");
+            sb.Append("\"connected\":").Append(Bool(connectedToSimulator)).Append(",");
+            sb.Append("\"latitude\":null,");
+            sb.Append("\"longitude\":null,");
+            sb.Append("\"altitude\":null,");
+            sb.Append("\"groundspeed\":null,");
+            sb.Append("\"heading\":null,");
+            sb.Append("\"callsign\":\"SIMCONNECT\",");
+            sb.Append("\"flight_plan\":{\"departure\":null,\"arrival\":null,\"aircraft_short\":\"UNKNOWN\"},");
+            sb.Append("\"source\":\"simconnect-bridge\",");
+            sb.Append("\"last_error\":").Append(JsonStringOrNull(lastError)).Append(",");
+            sb.Append("\"Connected to Simulator\":").Append(Bool(connectedToSimulator)).Append(",");
+            sb.Append("\"Connected to Backend\":").Append(Bool(backendConnected)).Append(",");
+            sb.Append("\"simulator\":\"Microsoft Flight Simulator\",");
+            sb.Append("\"aircraftType\":\"UNKNOWN\",");
+            sb.Append("\"aircraftPath\":null,");
+            sb.Append("\"fps\":").Append(Num(latestFrameRate)).Append(",");
+            sb.Append("\"simulationRate\":").Append(Num(latestSimulationRate)).Append(",");
+            sb.Append("\"position\":{\"latitude\":null,\"longitude\":null},");
+            sb.Append("\"headingTrueDegrees\":null,");
+            sb.Append("\"headingMagneticDegrees\":null,");
+            sb.Append("\"gForce\":null,");
+            sb.Append("\"altitudeMeters\":null,");
+            sb.Append("\"pitchDegrees\":null,");
+            sb.Append("\"bankDegrees\":null,");
+            sb.Append("\"groundElevationMeters\":null,");
+            sb.Append("\"landingRateMetersPerSecond\":null,");
+            sb.Append("\"onGround\":null,");
+            sb.Append("\"indicatedAirspeedMetersPerSecond\":null,");
+            sb.Append("\"trueAirspeedMetersPerSecond\":null,");
+            sb.Append("\"barberPoleAirspeedMetersPerSecond\":null,");
+            sb.Append("\"groundSpeedMetersPerSecond\":null,");
+            sb.Append("\"verticalSpeedMetersPerSecond\":null,");
+            sb.Append("\"parkingBrake\":null,");
+            sb.Append("\"numFlapPositions\":null,");
+            sb.Append("\"gearDown\":null,");
+            sb.Append("\"doorsOpen\":null,");
+            sb.Append("\"lights\":{\"navigation\":null,\"beacon\":null,\"strobes\":null,\"instruments\":null,\"logo\":null,\"cabin\":null},");
+            sb.Append("\"com1\":null,");
+            sb.Append("\"com2\":null,");
+            sb.Append("\"nav1\":null,");
+            sb.Append("\"nav2\":null,");
+            sb.Append("\"transponder\":null,");
+            sb.Append("\"engineType\":null,");
+            sb.Append("\"engines\":[{\"ittDegreesCelsius\":null,\"antiIce\":{\"antiIceEnabled\":null}},{\"ittDegreesCelsius\":null,\"antiIce\":{\"antiIceEnabled\":null}}],");
+            sb.Append("\"fuelTanks\":[");
+            sb.Append("{\"position\":\"FUEL_TANK_POSITION_CENTER\",\"capacityKgs\":null},");
+            sb.Append("{\"position\":\"FUEL_TANK_POSITION_CENTER_2\",\"capacityKgs\":null},");
+            sb.Append("{\"position\":\"FUEL_TANK_POSITION_CENTER_3\"},");
+            sb.Append("{\"position\":\"FUEL_TANK_POSITION_LEFT_MAIN\",\"capacityKgs\":null,\"percentageFilled\":null},");
+            sb.Append("{\"position\":\"FUEL_TANK_POSITION_LEFT_AUX\"},");
+            sb.Append("{\"position\":\"FUEL_TANK_POSITION_LEFT_TIP\"},");
+            sb.Append("{\"position\":\"FUEL_TANK_POSITION_RIGHT_MAIN\",\"capacityKgs\":null,\"percentageFilled\":null},");
+            sb.Append("{\"position\":\"FUEL_TANK_POSITION_RIGHT_AUX\"},");
+            sb.Append("{\"position\":\"FUEL_TANK_POSITION_RIGHT_TIP\"},");
+            sb.Append("{\"position\":\"FUEL_TANK_POSITION_EXTERNAL_1\"},");
+            sb.Append("{\"position\":\"FUEL_TANK_POSITION_EXTERNAL_2\"}");
+            sb.Append("],");
+            sb.Append("\"outsideAirTemperatureCelsius\":null,");
+            sb.Append("\"visibilityKm\":null,");
+            sb.Append("\"windSpeedMetersPerSecond\":null,");
+            sb.Append("\"windDirectionDegrees\":null,");
+            sb.Append("\"ambientPressurePascal\":null,");
+            sb.Append("\"seaLevelPressurePascal\":null,");
+            sb.Append("\"barometerSettingPascal\":null,");
+            sb.Append("\"apu\":{\"status\":\"\"},");
+            sb.Append("\"pressurization\":{\"cabinAltitudeMeters\":null},");
+            sb.Append("\"flightControls\":{\"yawDamperEnabled\":[null]},");
+            sb.Append("\"autopilot\":{\"flightDirectorEnabled\":null,\"modes\":[],\"airspeedHoldMetersPerSecond\":null,\"machHoldMach\":null,\"altitudeHoldMeters\":null,\"altitudeArmMeters\":null,\"headingLockDegrees\":null,\"pitchHoldDegrees\":null,\"verticalSpeedHoldMetersPerSecond\":null},");
+            sb.Append("\"aircraftInformation\":{\"simulatorPath\":\"\",\"packagePath\":\"\",\"version\":\"1.1.0\"},");
+            sb.Append("\"diagnostics\":{\"rejected\":[]}");
+            sb.Append("}");
+            return sb.ToString();
         }
 
-        private string BuildCallsign(Telemetry t)
+        private string BuildBackendJson(Telemetry t, string aircraftTitle, bool connected, string lastError)
         {
-            string airline = Clean(t.atcAirline);
-            string flightNumber = Clean(t.atcFlightNumber);
-            string atcId = Clean(t.atcId);
+            var rejected = new List<TelemetryRejectedValue>();
+            string callsign = BuildCallsign();
+            string aircraftShort = BuildAircraftShort(aircraftTitle);
+            double? latitude = TelemetryMath.ValidateNumeric("latitude", t.latitude, t.latitude, rejected);
+            double? longitude = TelemetryMath.ValidateNumeric("longitude", t.longitude, t.longitude, rejected);
+            double? altitudeMeters = TelemetryMath.ValidateNumeric("altitudeMeters", t.altitudeMeters, t.altitudeMeters, rejected);
+            double convertedGroundspeed = TelemetryMath.KnotsToMetersPerSecond(t.groundSpeedMetersPerSecond);
+            double? groundspeed = TelemetryMath.ValidateNumeric("groundSpeedMetersPerSecond", t.groundSpeedMetersPerSecond, ZeroNoise(convertedGroundspeed, 0.01), rejected);
+            double? heading = TelemetryMath.ValidateNumeric("headingTrueDegrees", t.headingTrueDegrees, NormalizeHeading(t.headingTrueDegrees), rejected);
+            double? headingMagnetic = TelemetryMath.ValidateNumeric("headingMagneticDegrees", t.headingMagneticDegrees, NormalizeHeading(t.headingMagneticDegrees), rejected);
+            double convertedVerticalSpeed = TelemetryMath.FeetPerSecondToMetersPerSecond(t.verticalSpeedMetersPerSecond);
+            double? verticalSpeed = TelemetryMath.ValidateNumeric("verticalSpeedMetersPerSecond", t.verticalSpeedMetersPerSecond, ZeroNoise(convertedVerticalSpeed, 0.001), rejected);
+            string engineType = MapEngineType(t.engineType, aircraftShort);
+            string simulator = "Microsoft Flight Simulator";
+            List<string> autopilotModes = BuildAutopilotModes(t);
+            string apuStatus = BuildApuStatus(t);
+            string flightDirectorEnabled = JsonBoolOrNull(t.flightDirectorEnabled);
+            double? visibilityKm = TelemetryMath.ValidateNumeric("visibilityKm", t.visibilityMeters, TelemetryMath.MetersToKilometers(t.visibilityMeters), rejected);
+            double? windSpeedMetersPerSecond = TelemetryMath.ValidateNumeric("windSpeedMetersPerSecond", t.windSpeedKnots, TelemetryMath.KnotsToMetersPerSecond(t.windSpeedKnots), rejected);
+            double? windDirectionDegrees = TelemetryMath.ValidateNumeric("windDirectionDegrees", t.windDirectionDegrees, NormalizeHeading(t.windDirectionDegrees), rejected);
+            double? ambientPressurePascal = TelemetryMath.ValidateNumeric("ambientPressurePascal", t.ambientPressureInchesHg, TelemetryMath.InchesHgToPascals(t.ambientPressureInchesHg), rejected);
+            double? seaLevelPressurePascal = TelemetryMath.ValidateNumeric("seaLevelPressurePascal", t.seaLevelPressurePascal, TelemetryMath.MillibarsToPascals(t.seaLevelPressurePascal), rejected);
+            double? barometerSettingPascal = TelemetryMath.ValidateNumeric("barometerSettingPascal", t.barometerSettingMillibars, TelemetryMath.MillibarsToPascals(t.barometerSettingMillibars), rejected);
+            double? outsideAirTemperatureCelsius = TelemetryMath.ValidateNumeric("outsideAirTemperatureCelsius", t.outsideAirTemperatureCelsius, t.outsideAirTemperatureCelsius, rejected);
+            double? autopilotAirspeedHoldMetersPerSecond = TelemetryMath.ValidateNumeric("autopilot.airspeedHoldMetersPerSecond", t.autopilotAirspeedHoldKnots, TelemetryMath.KnotsToMetersPerSecond(t.autopilotAirspeedHoldKnots), rejected);
+            double? autopilotMachHoldMach = TelemetryMath.ValidateNumeric("autopilot.machHoldMach", t.autopilotMachHoldMach, t.autopilotMachHoldMach, rejected);
+            double? autopilotAltitudeHoldMeters = TelemetryMath.ValidateNumeric("autopilot.altitudeHoldMeters", t.autopilotAltitudeHoldFeet, TelemetryMath.FeetToMeters(t.autopilotAltitudeHoldFeet), rejected);
+            double? autopilotHeadingLockDegrees = TelemetryMath.ValidateNumeric("autopilot.headingLockDegrees", t.autopilotHeadingLockDegrees, NormalizeHeading(t.autopilotHeadingLockDegrees), rejected);
+            double? autopilotPitchHoldDegrees = TelemetryMath.ValidateNumeric("autopilot.pitchHoldDegrees", t.autopilotPitchHoldRadians, TelemetryMath.RadiansToDegrees(t.autopilotPitchHoldRadians), rejected);
+            double? autopilotVerticalSpeedHoldMetersPerSecond = TelemetryMath.ValidateNumeric("autopilot.verticalSpeedHoldMetersPerSecond", t.autopilotVerticalSpeedHoldFeetPerMinute, TelemetryMath.FeetPerMinuteToMetersPerSecond(t.autopilotVerticalSpeedHoldFeetPerMinute), rejected);
+            double? indicatedAirspeedMetersPerSecond = TelemetryMath.ValidateNumeric("indicatedAirspeedMetersPerSecond", t.indicatedAirspeedMetersPerSecond, TelemetryMath.KnotsToMetersPerSecond(t.indicatedAirspeedMetersPerSecond), rejected);
+            double? trueAirspeedMetersPerSecond = TelemetryMath.ValidateNumeric("trueAirspeedMetersPerSecond", t.trueAirspeedMetersPerSecond, TelemetryMath.KnotsToMetersPerSecond(t.trueAirspeedMetersPerSecond), rejected);
+            double? barberPoleAirspeedMetersPerSecond = TelemetryMath.ValidateNumeric("barberPoleAirspeedMetersPerSecond", t.barberPoleAirspeedMetersPerSecond, TelemetryMath.KnotsToMetersPerSecond(t.barberPoleAirspeedMetersPerSecond), rejected);
+            string com1 = TelemetryMath.ValidateFrequencyString("com1", t.com1Frequency, TelemetryMath.FormatComFrequencyBcd16(t.com1Frequency), rejected);
+            string com2 = TelemetryMath.ValidateFrequencyString("com2", t.com2Frequency, TelemetryMath.FormatComFrequencyBcd16(t.com2Frequency), rejected);
+            string nav1 = TelemetryMath.ValidateFrequencyString("nav1", t.nav1Frequency, TelemetryMath.FormatFrequency(t.nav1Frequency), rejected);
+            string nav2 = TelemetryMath.ValidateFrequencyString("nav2", t.nav2Frequency, TelemetryMath.FormatFrequency(t.nav2Frequency), rejected);
 
-            if (!string.IsNullOrWhiteSpace(airline) && !string.IsNullOrWhiteSpace(flightNumber))
-            {
-                return airline.Replace(" ", "").ToUpperInvariant() + flightNumber.Replace(" ", "");
-            }
+            var sb = new StringBuilder(4096);
+            sb.Append("{");
+            sb.Append("\"online\":").Append(Bool(connected)).Append(",");
+            sb.Append("\"connected\":").Append(Bool(connected)).Append(",");
+            sb.Append("\"latitude\":").Append(Num(latitude)).Append(",");
+            sb.Append("\"longitude\":").Append(Num(longitude)).Append(",");
+            sb.Append("\"altitude\":").Append(Num(altitudeMeters)).Append(",");
+            sb.Append("\"groundspeed\":").Append(Num(groundspeed)).Append(",");
+            sb.Append("\"heading\":").Append(Num(heading)).Append(",");
+            sb.Append("\"callsign\":\"").Append(Escape(callsign)).Append("\",");
+            sb.Append("\"flight_plan\":{");
+            sb.Append("\"departure\":null,");
+            sb.Append("\"arrival\":null,");
+            sb.Append("\"aircraft_short\":\"").Append(Escape(aircraftShort)).Append("\"");
+            sb.Append("},");
+            sb.Append("\"source\":\"simconnect-bridge\",");
+            sb.Append("\"last_error\":").Append(JsonStringOrNull(lastError)).Append(",");
 
-            if (!string.IsNullOrWhiteSpace(atcId))
-            {
-                return atcId.Replace(" ", "").ToUpperInvariant();
-            }
+            sb.Append("\"Connected to Simulator\":").Append(Bool(connected)).Append(",");
+            sb.Append("\"Connected to Backend\":").Append(Bool(backendConnected)).Append(",");
+            sb.Append("\"simulator\":\"").Append(Escape(simulator)).Append("\",");
+            sb.Append("\"aircraftType\":\"").Append(Escape(aircraftShort)).Append("\",");
+            sb.Append("\"aircraftPath\":null,");
+            sb.Append("\"fps\":").Append(Num(latestFrameRate)).Append(",");
+            sb.Append("\"simulationRate\":").Append(Num(latestSimulationRate)).Append(",");
+            sb.Append("\"position\":{");
+            sb.Append("\"latitude\":").Append(Num(latitude)).Append(",");
+            sb.Append("\"longitude\":").Append(Num(longitude));
+            sb.Append("},");
+            sb.Append("\"headingTrueDegrees\":").Append(Num(heading)).Append(",");
+            sb.Append("\"headingMagneticDegrees\":").Append(Num(headingMagnetic)).Append(",");
+            sb.Append("\"gForce\":").Append(Num(t.gForce)).Append(",");
+            sb.Append("\"altitudeMeters\":").Append(Num(altitudeMeters)).Append(",");
+            sb.Append("\"pitchDegrees\":").Append(Num(t.pitchDegrees)).Append(",");
+            sb.Append("\"bankDegrees\":").Append(Num(t.bankDegrees)).Append(",");
+            sb.Append("\"groundElevationMeters\":").Append(Num(t.groundElevationMeters)).Append(",");
+            sb.Append("\"landingRateMetersPerSecond\":").Append(Num(t.landingRateMetersPerSecond)).Append(",");
+            sb.Append("\"onGround\":").Append(JsonBoolOrNull(t.onGround)).Append(",");
+            sb.Append("\"indicatedAirspeedMetersPerSecond\":").Append(Num(indicatedAirspeedMetersPerSecond)).Append(",");
+            sb.Append("\"trueAirspeedMetersPerSecond\":").Append(Num(trueAirspeedMetersPerSecond)).Append(",");
+            sb.Append("\"barberPoleAirspeedMetersPerSecond\":").Append(Num(barberPoleAirspeedMetersPerSecond)).Append(",");
+            sb.Append("\"groundSpeedMetersPerSecond\":").Append(Num(groundspeed)).Append(",");
+            sb.Append("\"verticalSpeedMetersPerSecond\":").Append(Num(verticalSpeed)).Append(",");
+            sb.Append("\"parkingBrake\":").Append(JsonBoolOrNull(t.parkingBrake)).Append(",");
+            sb.Append("\"numFlapPositions\":").Append(Num(t.numFlapPositions)).Append(",");
+            sb.Append("\"gearDown\":").Append(JsonBoolOrNull(t.gearDown)).Append(",");
+            sb.Append("\"doorsOpen\":").Append(JsonBoolOrNull(t.exitOpen)).Append(",");
+            sb.Append("\"lights\":{");
+            sb.Append("\"navigation\":").Append(JsonBoolOrNull(t.lightNavigation)).Append(",");
+            sb.Append("\"beacon\":").Append(JsonBoolOrNull(t.lightBeacon)).Append(",");
+            sb.Append("\"strobes\":").Append(JsonBoolOrNull(t.lightStrobes)).Append(",");
+            sb.Append("\"instruments\":").Append(JsonBoolOrNull(t.lightInstruments)).Append(",");
+            sb.Append("\"logo\":").Append(JsonBoolOrNull(t.lightLogo)).Append(",");
+            sb.Append("\"cabin\":").Append(JsonBoolOrNull(t.lightCabin));
+            sb.Append("},");
+            sb.Append("\"com1\":").Append(JsonStringOrNull(com1)).Append(",");
+            sb.Append("\"com2\":").Append(JsonStringOrNull(com2)).Append(",");
+            sb.Append("\"nav1\":").Append(JsonStringOrNull(nav1)).Append(",");
+            sb.Append("\"nav2\":").Append(JsonStringOrNull(nav2)).Append(",");
+            sb.Append("\"transponder\":").Append(JsonStringOrNull(FormatTransponder(t.transponderCode))).Append(",");
+            sb.Append("\"engineType\":").Append(JsonStringOrNull(engineType)).Append(",");
+            sb.Append("\"engines\":[");
+            sb.Append("{\"ittDegreesCelsius\":").Append(Num(t.itt1DegreesCelsius)).Append(",\"antiIce\":{\"antiIceEnabled\":").Append(JsonBoolOrNull(t.antiIce1Enabled)).Append("}},");
+            sb.Append("{\"ittDegreesCelsius\":").Append(Num(t.itt2DegreesCelsius)).Append(",\"antiIce\":{\"antiIceEnabled\":").Append(JsonBoolOrNull(t.antiIce2Enabled)).Append("}}");
+            sb.Append("],");
+            sb.Append("\"fuelTanks\":[");
+            sb.Append(BuildFuelTankJson("FUEL_TANK_POSITION_CENTER", t.fuelTankCenterCapacityGallons, t.fuelTankCenterQuantityGallons, t.fuelWeightPerGallon, rejected)).Append(",");
+            sb.Append(BuildFuelTankJson("FUEL_TANK_POSITION_CENTER_2", t.fuelTankCenter2CapacityGallons, t.fuelTankCenter2QuantityGallons, t.fuelWeightPerGallon, rejected)).Append(",");
+            sb.Append(BuildFuelTankJson("FUEL_TANK_POSITION_CENTER_3", t.fuelTankCenter3CapacityGallons, t.fuelTankCenter3QuantityGallons, t.fuelWeightPerGallon, rejected)).Append(",");
+            sb.Append(BuildFuelTankJson("FUEL_TANK_POSITION_LEFT_MAIN", t.fuelTankLeftMainCapacityGallons, t.fuelTankLeftMainQuantityGallons, t.fuelWeightPerGallon, rejected)).Append(",");
+            sb.Append(BuildFuelTankJson("FUEL_TANK_POSITION_LEFT_AUX", t.fuelTankLeftAuxCapacityGallons, t.fuelTankLeftAuxQuantityGallons, t.fuelWeightPerGallon, rejected)).Append(",");
+            sb.Append(BuildFuelTankJson("FUEL_TANK_POSITION_LEFT_TIP", t.fuelTankLeftTipCapacityGallons, t.fuelTankLeftTipQuantityGallons, t.fuelWeightPerGallon, rejected)).Append(",");
+            sb.Append(BuildFuelTankJson("FUEL_TANK_POSITION_RIGHT_MAIN", t.fuelTankRightMainCapacityGallons, t.fuelTankRightMainQuantityGallons, t.fuelWeightPerGallon, rejected)).Append(",");
+            sb.Append(BuildFuelTankJson("FUEL_TANK_POSITION_RIGHT_AUX", t.fuelTankRightAuxCapacityGallons, t.fuelTankRightAuxQuantityGallons, t.fuelWeightPerGallon, rejected)).Append(",");
+            sb.Append(BuildFuelTankJson("FUEL_TANK_POSITION_RIGHT_TIP", t.fuelTankRightTipCapacityGallons, t.fuelTankRightTipQuantityGallons, t.fuelWeightPerGallon, rejected)).Append(",");
+            sb.Append(BuildFuelTankJson("FUEL_TANK_POSITION_EXTERNAL_1", t.fuelTankExternal1CapacityGallons, t.fuelTankExternal1QuantityGallons, t.fuelWeightPerGallon, rejected)).Append(",");
+            sb.Append(BuildFuelTankJson("FUEL_TANK_POSITION_EXTERNAL_2", t.fuelTankExternal2CapacityGallons, t.fuelTankExternal2QuantityGallons, t.fuelWeightPerGallon, rejected));
+            sb.Append("],");
+            sb.Append("\"outsideAirTemperatureCelsius\":").Append(Num(outsideAirTemperatureCelsius)).Append(",");
+            sb.Append("\"visibilityKm\":").Append(Num(visibilityKm)).Append(",");
+            sb.Append("\"windSpeedMetersPerSecond\":").Append(Num(windSpeedMetersPerSecond)).Append(",");
+            sb.Append("\"windDirectionDegrees\":").Append(Num(windDirectionDegrees)).Append(",");
+            sb.Append("\"ambientPressurePascal\":").Append(Num(ambientPressurePascal)).Append(",");
+            sb.Append("\"seaLevelPressurePascal\":").Append(Num(seaLevelPressurePascal)).Append(",");
+            sb.Append("\"barometerSettingPascal\":").Append(Num(barometerSettingPascal)).Append(",");
+            sb.Append("\"apu\":{\"status\":").Append(JsonStringOrNull(apuStatus)).Append("},");
+            sb.Append("\"pressurization\":{\"cabinAltitudeMeters\":").Append(Num(t.cabinAltitudeMeters)).Append("},");
+            sb.Append("\"flightControls\":{\"yawDamperEnabled\":[").Append(JsonBoolOrNull(t.yawDamperEnabled)).Append("]},");
+            sb.Append("\"autopilot\":{");
+            sb.Append("\"flightDirectorEnabled\":").Append(flightDirectorEnabled).Append(",");
+            sb.Append("\"modes\":").Append(JsonStringArray(autopilotModes)).Append(",");
+            sb.Append("\"airspeedHoldMetersPerSecond\":").Append(Num(autopilotAirspeedHoldMetersPerSecond)).Append(",");
+            sb.Append("\"machHoldMach\":").Append(Num(autopilotMachHoldMach)).Append(",");
+            sb.Append("\"altitudeHoldMeters\":").Append(Num(autopilotAltitudeHoldMeters)).Append(",");
+            sb.Append("\"altitudeArmMeters\":").Append(Num(autopilotAltitudeHoldMeters)).Append(",");
+            sb.Append("\"headingLockDegrees\":").Append(Num(autopilotHeadingLockDegrees)).Append(",");
+            sb.Append("\"pitchHoldDegrees\":").Append(Num(autopilotPitchHoldDegrees)).Append(",");
+            sb.Append("\"verticalSpeedHoldMetersPerSecond\":").Append(Num(autopilotVerticalSpeedHoldMetersPerSecond));
+            sb.Append("},");
+            sb.Append("\"aircraftInformation\":{");
+            sb.Append("\"simulatorPath\":\"\",");
+            sb.Append("\"packagePath\":\"\",");
+            sb.Append("\"version\":\"1.1.0\"");
+            sb.Append("},");
+            sb.Append("\"diagnostics\":").Append(BuildDiagnosticsJson(rejected));
+            sb.Append("}");
+            LogRejectedTelemetry(rejected);
+            return sb.ToString();
+        }
 
+        private string BuildCallsign()
+        {
             return "SIMCONNECT";
         }
 
-        private string BuildAircraftShort(Telemetry t)
+        private string BuildAircraftShort(string aircraftTitle)
         {
-            string model = Clean(t.atcModel);
-            string title = Clean(t.title);
-            string combined = (model + " " + title).ToUpperInvariant();
-
-            if (!string.IsNullOrWhiteSpace(model))
-            {
-                string upperModel = model.ToUpperInvariant();
-
-                if (upperModel.Length <= 8)
-                {
-                    return upperModel;
-                }
-            }
+            string title = Clean(aircraftTitle);
+            string combined = title.ToUpperInvariant();
 
             if (combined.Contains("A20N")) return "A20N";
             if (combined.Contains("A320")) return "A320";
@@ -1096,16 +1371,18 @@ namespace SimpleSimConnector
 
         private void UpdateLatestLabel(Telemetry t)
         {
-            string callsign = BuildCallsign(t);
-            string aircraftShort = BuildAircraftShort(t);
+            string callsign = BuildCallsign();
+            string aircraftShort = BuildAircraftShort(latestAircraftTitle);
+            double altitudeFeet = TelemetryMath.MetersToFeet(t.altitudeMeters);
+            double groundspeedKnots = ZeroNoise(t.groundSpeedMetersPerSecond, 0.01);
 
             string text =
                 callsign + " / " + aircraftShort + Environment.NewLine +
                 "Lat " + Num(t.latitude) +
                 " Lon " + Num(t.longitude) +
-                " Alt " + Math.Round(t.altitude).ToString(CultureInfo.InvariantCulture) + " ft" +
-                " GS " + Math.Round(ZeroNoise(t.groundSpeed, 0.01)).ToString(CultureInfo.InvariantCulture) + " kt" +
-                " HDG " + Math.Round(NormalizeHeading(t.heading)).ToString(CultureInfo.InvariantCulture);
+                " Alt " + Math.Round(altitudeFeet).ToString(CultureInfo.InvariantCulture) + " ft" +
+                " GS " + Math.Round(groundspeedKnots).ToString(CultureInfo.InvariantCulture) + " kt" +
+                " HDG " + Math.Round(NormalizeHeading(t.headingTrueDegrees)).ToString(CultureInfo.InvariantCulture);
 
             if (latestLabel.InvokeRequired)
             {
@@ -1194,6 +1471,11 @@ namespace SimpleSimConnector
 
         private static double NormalizeHeading(double heading)
         {
+            if (double.IsNaN(heading) || double.IsInfinity(heading))
+            {
+                return heading;
+            }
+
             heading = heading % 360.0;
 
             if (heading < 0)
@@ -1214,9 +1496,403 @@ namespace SimpleSimConnector
             return value.ToString("G17", CultureInfo.InvariantCulture);
         }
 
+        private static string Num(double? value)
+        {
+            return value.HasValue ? Num(value.Value) : "null";
+        }
+
         private static string Bool(bool value)
         {
             return value ? "true" : "false";
+        }
+
+        private static bool IsTruthy(double value)
+        {
+            return !double.IsNaN(value) && !double.IsInfinity(value) && value >= 0.5;
+        }
+
+        private static string JsonBoolOrNull(double value)
+        {
+            if (double.IsNaN(value) || double.IsInfinity(value))
+            {
+                return "null";
+            }
+
+            return IsTruthy(value) ? "true" : "false";
+        }
+
+        private static double CombineAnyTrue(params double[] values)
+        {
+            bool sawFinite = false;
+
+            foreach (double value in values)
+            {
+                if (double.IsNaN(value) || double.IsInfinity(value))
+                {
+                    continue;
+                }
+
+                sawFinite = true;
+                if (IsTruthy(value))
+                {
+                    return 1.0;
+                }
+            }
+
+            return sawFinite ? 0.0 : double.NaN;
+        }
+
+        private string BuildDiagnosticsJson(IList<TelemetryRejectedValue> rejected)
+        {
+            var sb = new StringBuilder();
+            sb.Append("{\"rejected\":[");
+
+            for (int i = 0; i < rejected.Count; i++)
+            {
+                if (i > 0)
+                {
+                    sb.Append(",");
+                }
+
+                TelemetryRejectedValue item = rejected[i];
+                sb.Append("{");
+                sb.Append("\"jsonField\":").Append(JsonStringOrNull(item.JsonField)).Append(",");
+                sb.Append("\"simVarName\":").Append(JsonStringOrNull(item.SimVarName)).Append(",");
+                sb.Append("\"requestedUnit\":").Append(JsonStringOrNull(item.RequestedUnit)).Append(",");
+                sb.Append("\"rawValue\":").Append(JsonStringOrNull(item.RawValue)).Append(",");
+                sb.Append("\"convertedValue\":").Append(JsonStringOrNull(item.ConvertedValue)).Append(",");
+                sb.Append("\"sanityRange\":").Append(JsonStringOrNull(item.SanityRange)).Append(",");
+                sb.Append("\"reason\":").Append(JsonStringOrNull(item.Reason)).Append(",");
+                sb.Append("\"action\":").Append(JsonStringOrNull(item.Action));
+                sb.Append("}");
+            }
+
+            sb.Append("]}");
+            return sb.ToString();
+        }
+
+        private void LogRejectedTelemetry(IList<TelemetryRejectedValue> rejected)
+        {
+            foreach (TelemetryRejectedValue item in rejected)
+            {
+                Log(
+                    "Rejected telemetry field " +
+                    (item.JsonField ?? "unknown") +
+                    " simvar=" + (item.SimVarName ?? "") +
+                    " requestedUnit=" + (item.RequestedUnit ?? "") +
+                    " raw=" + (item.RawValue ?? "null") +
+                    " converted=" + (item.ConvertedValue ?? "null") +
+                    " sanity=" + (item.SanityRange ?? "") +
+                    " reason=" + (item.Reason ?? "") +
+                    " action=" + (item.Action ?? ""));
+            }
+        }
+
+        private static string FormatFrequency(double value)
+        {
+            if (double.IsNaN(value) || double.IsInfinity(value) || value <= 0)
+            {
+                return null;
+            }
+
+            return value.ToString("0.00", CultureInfo.InvariantCulture);
+        }
+
+        private static string FormatComFrequencyBcd16(double value)
+        {
+            if (double.IsNaN(value) || double.IsInfinity(value) || value <= 0)
+            {
+                return null;
+            }
+
+            int bcd = (int)Math.Round(value);
+            int nibble1 = (bcd >> 12) & 0xF;
+            int nibble2 = (bcd >> 8) & 0xF;
+            int nibble3 = (bcd >> 4) & 0xF;
+            int nibble4 = bcd & 0xF;
+
+            double mhz = 100.0 + (nibble1 * 10.0) + nibble2 + (nibble3 / 10.0) + (nibble4 / 100.0);
+            return mhz.ToString("0.00", CultureInfo.InvariantCulture);
+        }
+
+        private static string FormatTransponder(double value)
+        {
+            if (double.IsNaN(value) || double.IsInfinity(value) || value < 0)
+            {
+                return null;
+            }
+
+            int rounded = (int)Math.Round(value);
+            return rounded.ToString("0000", CultureInfo.InvariantCulture);
+        }
+
+        private static string MapEngineType(double value, string aircraftShort)
+        {
+            if (double.IsNaN(value) || double.IsInfinity(value))
+            {
+                return InferEngineTypeFromAircraft(aircraftShort);
+            }
+
+            switch ((int)Math.Round(value))
+            {
+                case 0: return "ENGINE_TYPE_PISTON";
+                case 1: return "ENGINE_TYPE_JET";
+                case 2: return "ENGINE_TYPE_NONE";
+                case 3: return "ENGINE_TYPE_HELO_TURBINE";
+                case 4: return "ENGINE_TYPE_UNSUPPORTED";
+                case 5: return "ENGINE_TYPE_TURBOPROP";
+                case 6: return "ENGINE_TYPE_ELECTRIC";
+                default: return InferEngineTypeFromAircraft(aircraftShort) ?? "ENGINE_TYPE_UNKNOWN";
+            }
+        }
+
+        private static string InferEngineTypeFromAircraft(string aircraftShort)
+        {
+            string upper = Clean(aircraftShort).ToUpperInvariant();
+
+            if (upper.StartsWith("A3") || upper.StartsWith("B7") || upper.StartsWith("B78") || upper.StartsWith("B77") || upper.StartsWith("B74"))
+            {
+                return "ENGINE_TYPE_JET";
+            }
+
+            if (upper.StartsWith("C172") || upper.StartsWith("DA40") || upper.StartsWith("DA62"))
+            {
+                return "ENGINE_TYPE_PISTON";
+            }
+
+            if (upper.StartsWith("TBM"))
+            {
+                return "ENGINE_TYPE_TURBOPROP";
+            }
+
+            return null;
+        }
+
+        private static string BuildApuStatus(Telemetry t)
+        {
+            if (double.IsNaN(t.apuPctRpm) || double.IsInfinity(t.apuPctRpm))
+            {
+                return null;
+            }
+
+            if (IsTruthy(t.apuGeneratorActive) || t.apuPctRpm >= 95.0)
+            {
+                return "running";
+            }
+
+            if (IsTruthy(t.apuSwitch) || t.apuPctRpm > 1.0)
+            {
+                return "starting";
+            }
+
+            return "off";
+        }
+
+        private string BuildFuelTankJson(
+            string position,
+            double capacityGallons,
+            double quantityGallons,
+            double fuelWeightPerGallon,
+            IList<TelemetryRejectedValue> rejected)
+        {
+            var sb = new StringBuilder();
+            sb.Append("{\"position\":\"").Append(Escape(position)).Append("\"");
+
+            double? capacityKgs = TelemetryMath.ValidateNumeric(
+                "fuelTanks[*].capacityKgs",
+                capacityGallons,
+                TelemetryMath.GallonsToKilograms(capacityGallons, fuelWeightPerGallon),
+                rejected);
+            if (capacityKgs.HasValue)
+            {
+                sb.Append(",\"capacityKgs\":").Append(Num(capacityKgs));
+            }
+
+            double? percentageFilled = TelemetryMath.ValidateNumeric(
+                "fuelTanks[*].percentageFilled",
+                quantityGallons,
+                TelemetryMath.QuantityToPercent(quantityGallons, capacityGallons),
+                rejected);
+            if (percentageFilled.HasValue)
+            {
+                sb.Append(",\"percentageFilled\":").Append(Num(percentageFilled));
+            }
+
+            sb.Append("}");
+            return sb.ToString();
+        }
+
+        private static double GallonsToKilograms(double gallons, double poundsPerGallon)
+        {
+            if (double.IsNaN(gallons) || double.IsInfinity(gallons) || gallons < 0)
+            {
+                return double.NaN;
+            }
+
+            if (double.IsNaN(poundsPerGallon) || double.IsInfinity(poundsPerGallon) || poundsPerGallon <= 0)
+            {
+                return double.NaN;
+            }
+
+            return gallons * poundsPerGallon * 0.45359237;
+        }
+
+        private static double QuantityToPercent(double quantityGallons, double capacityGallons)
+        {
+            if (double.IsNaN(quantityGallons) || double.IsInfinity(quantityGallons) || quantityGallons < 0)
+            {
+                return double.NaN;
+            }
+
+            if (double.IsNaN(capacityGallons) || double.IsInfinity(capacityGallons) || capacityGallons <= 0)
+            {
+                return double.NaN;
+            }
+
+            return (quantityGallons / capacityGallons) * 100.0;
+        }
+
+        private static double MetersToFeet(double meters)
+        {
+            if (double.IsNaN(meters) || double.IsInfinity(meters))
+            {
+                return meters;
+            }
+
+            return meters * 3.280839895;
+        }
+
+        private static double FeetToMeters(double feet)
+        {
+            if (double.IsNaN(feet) || double.IsInfinity(feet))
+            {
+                return feet;
+            }
+
+            return feet / 3.280839895;
+        }
+
+        private static double MetersPerSecondToKnots(double metersPerSecond)
+        {
+            if (double.IsNaN(metersPerSecond) || double.IsInfinity(metersPerSecond))
+            {
+                return metersPerSecond;
+            }
+
+            return metersPerSecond * 1.94384449;
+        }
+
+        private static double KnotsToMetersPerSecond(double knots)
+        {
+            if (double.IsNaN(knots) || double.IsInfinity(knots))
+            {
+                return knots;
+            }
+
+            return knots / 1.94384449;
+        }
+
+        private static double FeetPerMinuteToMetersPerSecond(double feetPerMinute)
+        {
+            if (double.IsNaN(feetPerMinute) || double.IsInfinity(feetPerMinute))
+            {
+                return feetPerMinute;
+            }
+
+            return feetPerMinute * 0.00508;
+        }
+
+        private static double RadiansToDegrees(double radians)
+        {
+            if (double.IsNaN(radians) || double.IsInfinity(radians))
+            {
+                return radians;
+            }
+
+            return radians * (180.0 / Math.PI);
+        }
+
+        private static double MetersToKilometers(double meters)
+        {
+            if (double.IsNaN(meters) || double.IsInfinity(meters))
+            {
+                return meters;
+            }
+
+            return meters / 1000.0;
+        }
+
+        private static double InchesHgToPascals(double inchesHg)
+        {
+            if (double.IsNaN(inchesHg) || double.IsInfinity(inchesHg))
+            {
+                return inchesHg;
+            }
+
+            return inchesHg * 3386.389;
+        }
+
+        private static double MillibarsToPascals(double millibars)
+        {
+            if (double.IsNaN(millibars) || double.IsInfinity(millibars))
+            {
+                return millibars;
+            }
+
+            return millibars * 100.0;
+        }
+
+        private static List<string> BuildAutopilotModes(Telemetry t)
+        {
+            var modes = new List<string>();
+
+            if (IsTruthy(t.autopilotVerticalSpeedHoldActive))
+            {
+                modes.Add("AUTOPILOT_MODE_VERTICAL_SPEED_HOLD");
+            }
+
+            if (IsTruthy(t.autopilotAltitudeHoldActive))
+            {
+                modes.Add("AUTOPILOT_MODE_ALTITUDE_HOLD");
+            }
+
+            if (IsTruthy(t.autopilotHeadingLockActive))
+            {
+                modes.Add("AUTOPILOT_MODE_HEADING_HOLD");
+            }
+
+            if (IsTruthy(t.autopilotAirspeedHoldActive))
+            {
+                modes.Add("AUTOPILOT_MODE_AIRSPEED_HOLD");
+            }
+
+            if (IsTruthy(t.autopilotMachHoldActive))
+            {
+                modes.Add("AUTOPILOT_MODE_MACH_HOLD");
+            }
+
+            return modes;
+        }
+
+        private static string JsonStringArray(List<string> values)
+        {
+            if (values == null || values.Count == 0)
+            {
+                return "[]";
+            }
+
+            var sb = new StringBuilder();
+            sb.Append("[");
+            for (int i = 0; i < values.Count; i++)
+            {
+                if (i > 0)
+                {
+                    sb.Append(",");
+                }
+                sb.Append("\"").Append(Escape(values[i])).Append("\"");
+            }
+            sb.Append("]");
+            return sb.ToString();
         }
 
         private static string JsonStringOrNull(string value)

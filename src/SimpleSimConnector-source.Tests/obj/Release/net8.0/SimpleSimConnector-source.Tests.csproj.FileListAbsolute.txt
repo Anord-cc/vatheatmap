@@ -1,0 +1,15 @@
+C:\Users\Alex\simplesim\src\SimpleSimConnector-source.Tests\bin\Release\net8.0\SimpleSimConnector-source.Tests.exe
+C:\Users\Alex\simplesim\src\SimpleSimConnector-source.Tests\bin\Release\net8.0\SimpleSimConnector-source.Tests.deps.json
+C:\Users\Alex\simplesim\src\SimpleSimConnector-source.Tests\bin\Release\net8.0\SimpleSimConnector-source.Tests.runtimeconfig.json
+C:\Users\Alex\simplesim\src\SimpleSimConnector-source.Tests\bin\Release\net8.0\SimpleSimConnector-source.Tests.dll
+C:\Users\Alex\simplesim\src\SimpleSimConnector-source.Tests\bin\Release\net8.0\SimpleSimConnector-source.Tests.pdb
+C:\Users\Alex\simplesim\src\SimpleSimConnector-source.Tests\obj\Release\net8.0\SimpleSimConnector-source.Tests.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Alex\simplesim\src\SimpleSimConnector-source.Tests\obj\Release\net8.0\SimpleSimConnector-source.Tests.AssemblyInfoInputs.cache
+C:\Users\Alex\simplesim\src\SimpleSimConnector-source.Tests\obj\Release\net8.0\SimpleSimConnector-source.Tests.AssemblyInfo.cs
+C:\Users\Alex\simplesim\src\SimpleSimConnector-source.Tests\obj\Release\net8.0\SimpleSimConnector-source.Tests.csproj.CoreCompileInputs.cache
+C:\Users\Alex\simplesim\src\SimpleSimConnector-source.Tests\obj\Release\net8.0\SimpleSimConnector-source.Tests.sourcelink.json
+C:\Users\Alex\simplesim\src\SimpleSimConnector-source.Tests\obj\Release\net8.0\SimpleSimConnector-source.Tests.dll
+C:\Users\Alex\simplesim\src\SimpleSimConnector-source.Tests\obj\Release\net8.0\refint\SimpleSimConnector-source.Tests.dll
+C:\Users\Alex\simplesim\src\SimpleSimConnector-source.Tests\obj\Release\net8.0\SimpleSimConnector-source.Tests.pdb
+C:\Users\Alex\simplesim\src\SimpleSimConnector-source.Tests\obj\Release\net8.0\SimpleSimConnector-source.Tests.genruntimeconfig.cache
+C:\Users\Alex\simplesim\src\SimpleSimConnector-source.Tests\obj\Release\net8.0\ref\SimpleSimConnector-source.Tests.dll

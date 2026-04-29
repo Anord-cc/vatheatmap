@@ -62,6 +62,7 @@ Minimum local setup:
 DISCORD_CLIENT_ID=your_discord_client_id
 DISCORD_CLIENT_SECRET=your_discord_client_secret
 DISCORD_REDIRECT_URI=http://localhost:5000/auth/callback
+PUBLIC_BASE_URL=http://localhost:5000
 SECRET_KEY=replace_with_a_long_random_secret
 ALLOWED_DISCORD_IDS=123456789012345678
 ```
@@ -71,6 +72,7 @@ Optional variables:
 ```env
 SIMBRIEF_USERNAME=
 SIMBRIEF_USERID=
+SIMCONNECT_TELEMETRY_TOKEN=
 PASSKEY_RP_ID=localhost
 PASSKEY_ORIGIN=http://localhost:5000
 PASSKEY_RP_NAME=VATSIM HeatTracker
@@ -155,6 +157,12 @@ The app runs on:
 - `GET /api/flights` - recent flights
 - `GET /api/stats` - totals and top routes
 - `GET /api/simbrief` - latest SimBrief summary and route overlay
+- `POST /mcp` - remote MCP endpoint for ChatGPT/API clients
+- `GET /.well-known/oauth-protected-resource` - MCP OAuth resource metadata
+- `GET /.well-known/oauth-authorization-server` - OAuth authorization server metadata
+- `POST /oauth/register` - dynamic client registration for MCP clients
+- `GET /oauth/authorize` - OAuth authorization code flow for MCP clients
+- `POST /oauth/token` - OAuth token exchange for MCP clients
 
 ## Database
 

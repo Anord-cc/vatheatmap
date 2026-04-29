@@ -21,7 +21,6 @@ backend/__pycache__/
 *.pyc
 
 # Simconnect
-src/SimpleSimConnector
 backend/app-backup.py
 backend/simconnect-state.json"/backend/simconnect-state.json" 
 /backend/simconnect-state.json

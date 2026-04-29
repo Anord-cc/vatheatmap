@@ -65,6 +65,7 @@
 
   <ItemGroup>
     <Compile Include="Program.cs" />
+    <Compile Include="TelemetryBridgeSupport.cs" />
   </ItemGroup>
 
   <ItemGroup>
