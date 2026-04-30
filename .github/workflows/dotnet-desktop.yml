@@ -1,0 +1,70 @@
+name: .NET Desktop
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "src/SimpleSimConnector-source/**"
+      - ".github/workflows/dotnet-desktop.yml"
+  pull_request:
+    branches: [ main ]
+    paths:
+      - "src/SimpleSimConnector-source/**"
+      - ".github/workflows/dotnet-desktop.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  PROJECT_PATH: src\SimpleSimConnector-source\SimpleSimConnector.csproj
+  CONFIGURATION: Release
+  PLATFORM: x64
+  OUTPUT_DIR: SimpleSimConnector
+
+jobs:
+  build:
+    name: Build SimpleSimConnector
+    runs-on: [self-hosted, Windows, X64]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Add MSBuild to PATH
+        uses: microsoft/setup-msbuild@v3
+        with:
+          msbuild-architecture: x64
+
+      - name: Check MSFS SimConnect SDK
+        shell: pwsh
+        run: |
+          $managed = "C:\MSFS 2024 SDK\SimConnect SDK\lib\managed\Microsoft.FlightSimulator.SimConnect.dll"
+          $native = "C:\MSFS 2024 SDK\SimConnect SDK\lib\SimConnect.dll"
+
+          if (!(Test-Path $managed)) {
+            throw "Missing managed SimConnect DLL: $managed"
+          }
+
+          if (!(Test-Path $native)) {
+            throw "Missing native SimConnect DLL: $native"
+          }
+
+      - name: Build Release x64
+        shell: pwsh
+        run: |
+          msbuild "$env:PROJECT_PATH" `
+            /restore `
+            /t:Rebuild `
+            /p:Configuration=$env:CONFIGURATION `
+            /p:Platform=$env:PLATFORM `
+            /m `
+            /v:minimal
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: SimpleSimConnector-${{ github.sha }}
+          path: SimpleSimConnector\
+          if-no-files-found: error
+          retention-days: 14
